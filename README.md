@@ -1,6 +1,6 @@
-various nodejs hook for htcondor
+node-htcondor contains various nodejs hooks for htcondor.
 
-Right now, the only class it provides is eventlog watcher... I will be publishing other classes soon!
+Right now, the only class I am publishing is the htcondor eventlog watcher... (I will be publishing other classes soon!)
 
 To install:
 
