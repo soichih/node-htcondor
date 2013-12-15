@@ -1,7 +1,6 @@
-node-htcondor
-=============
+various nodejs hook for htcondor
 
-nodejs hook for htcondor
+Right now, the only class it provides is eventlog watcher... I will be publishing other classes soon!
 
 To install:
 
@@ -9,7 +8,10 @@ To install:
 npm install htcondor
 ```
 
-#Use:
+#eventlog:
+
+allows you to subscribe to condor event log, and to receive callback for each event published. You can the monitor job status changes, or any attribute changes to implement some cool features.
+
 ```javascript
 var eventlog = require('htcondor').eventlog
 
