@@ -10,7 +10,7 @@ npm install htcondor
 
 #eventlog:
 
-allows you to subscribe to condor event log, and to receive callback for each event published. You can the monitor job status changes, or any attribute changes to implement some cool features.
+This class allows you to subscribe to condor event log (usually at /var/log/condor/EventLog), and receive callbacks so that you can monitor job status or any other attribute changes.
 
 ```javascript
 var eventlog = require('htcondor').eventlog
