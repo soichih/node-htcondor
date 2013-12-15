@@ -1,23 +1,26 @@
 {
-  "name": "htcondor",
-  "version": "0.0.1",
-  "description": "nodejs hook for htcondor",
-  "main": "index.js",
-  "scripts": {
+    "name": "htcondor",
+    "version": "0.0.1",
+    "description": "nodejs hook for htcondor",
+    "main": "index.js",
+    "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
+    },
+    "repository": {
     "type": "git",
     "url": "https://github.com/soichih/node-htcondor"
-  },
-  "keywords": [
+    },
+    "keywords": [
     "htcondor",
     "condor",
     "osg"
-  ],
-  "author": "Soichi Hayashi",
-  "license": "MIT",
-  "bugs": {
+    ],
+    "author": "Soichi Hayashi",
+    "license": "MIT",
+    "bugs": {
     "url": "https://github.com/soichih/node-htcondor/issues"
-  }
+    },
+    "dependencies": {
+        "xml2js": "*"
+    }
 }
