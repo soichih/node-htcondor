@@ -1,0 +1,23 @@
+{
+  "name": "htcondor",
+  "version": "0.0.1",
+  "description": "nodejs hook for htcondor",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/soichih/node-htcondor"
+  },
+  "keywords": [
+    "htcondor",
+    "condor",
+    "osg"
+  ],
+  "author": "Soichi Hayashi",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/soichih/node-htcondor/issues"
+  }
+}
