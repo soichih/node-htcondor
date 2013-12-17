@@ -1,5 +1,6 @@
 var fs = require('fs');
 var xml2js = require('xml2js');
+var Tail = require('tail').Tail;
 
 var callbacks = [];
 
@@ -8,102 +9,45 @@ exports.eventlog = {
         callbacks.push(callback);
     },
     listen: function(path) {
-        console.log("eventlog lister listening on "+path);
-        //tail eventlog
-        var stats = fs.statSync(path);
-        var buffer = new Buffer(64);
-        var block = "";
-        var delim = "...\n";
-        fs.watch(path, function(event) {
-            if(event == "rename") {
-                stats.size = 0; //TODO - I am not sure if this is what we need to do?
-            } else if(event == "change") {
-                //make sure the target file still exists..
-                fs.exists(path, function(exists) {
-                    var new_stats = fs.statSync(path);
-                    //let's read the new content
-                    fs.open(path, "r", function(err, fd) {
-                        while(stats.size < new_stats.size) {
-                            //read some in sync..
-                            var size = fs.readSync(fd, buffer, 0, buffer.length, stats.size);
-                            stats.size += size;
-                            block = block + buffer.toString("ascii", 0, size);
+        //console.log("eventlog lister listening on "+path);
+        tail = new Tail(path, "...\n", {interval: 500});
+        tail.on("line", function(ablock) {
+            var lines = ablock.split("\n");
+            var header = lines.shift();
+            var eventid =  parseInt(header.substring(0,3));
+            var props = {
+                _jobid: header.substring(5,21),
+                _timestamp: header.substring(23,37),
+                _updatetime: new Date()
+            };
 
-                            //search for delimiter
-                            var pos = block.indexOf(delim);
-                            if(pos != -1) {
-                                ablock = block.substring(0, pos);
-                                block = block.substring(pos+delim.length);
-                                var lines = ablock.split("\n");
-                                var header = lines[0];
-
-                                //parse header
-                                var props = {
-                                    _eventid: parseInt(header.substring(0,3)),
-                                    _jobid: header.substring(5,21),
-                                    _timestamp: header.substring(23,37),
-                                    _updatetime: new Date()
-                                };
-
-                                //only listen to class ad update event (for now..)
-                                if(props._eventid == 28) {
-                                    //parse event body
-                                    var body = lines.slice(1);
-                                    body.forEach(function(line) {
-                                        if(line == "") return;
-                                        var kv = line.split(" = ");
-                                        //remove double quote from value if it's quoted
-                                        if(kv[1].indexOf("\"") == 0) {
-                                            kv[1] = kv[1].substring(1, kv[1].length-1);
-                                        }
-                                        //convert to int if its int
-                                        var i = parseInt(kv[1]);
-                                        if(i == kv[1]) {
-                                            kv[1] = i;
-                                        }
-                                        props[kv[0]] = kv[1];
-                                    });
-                                    //jobs[clusterid](props);
-                                    callbacks.forEach(function(callback) {
-                                        callback(props);
-                                    });
-                                }
-                                /*
-                                //do we care?
-                                var jobid_tokens = props._jobid.split(".");
-                                var clusterid = jobid_tokens[0];
-                                var procid = jobid_tokens[1];
-                                if(jobs[clusterid] != undefined) {
-                                    if(props.eventid == 28) {//class ad update event
-                                        //parse event body
-                                        var body = lines.slice(1);
-                                        body.forEach(function(line) {
-                                            if(line == "") return;
-                                            var kv = line.split(" = ");
-                                            //remove double quote from value if it's quoted
-                                            if(kv[1].indexOf("\"") == 0) {
-                                                kv[1] = kv[1].substring(1, kv[1].length-1);
-                                            }
-                                            //convert to int if its int
-                                            var i = parseInt(kv[1]);
-                                            if(i == kv[1]) {
-                                                kv[1] = i;
-                                            }
-                                            props[kv[0]] = kv[1];
-                                        });
-                                        jobs[clusterid](props);
-                                        callbacks.forEach(function(callback) {
-                                            callback(props);
-                                        });
-                                    }
-                                } else {
-                                    //console.log("ignoring "+clusterid);
-                                }
-                                */
-                            }
+            if(eventid == 28) { //Job ad information event
+                //parse class ad key/value
+                lines.forEach(function(line) {
+                    if(line == "") return;
+                    var kv = line.split(" = ");
+                    if(kv.length == 2) {
+                        //remove double quote from value if it's quoted
+                        if(kv[1].indexOf("\"") == 0) {
+                            kv[1] = kv[1].substring(1, kv[1].length-1);
                         }
-                        fs.close(fd);
-                    });
+                        //convert to int if its int
+                        var i = parseInt(kv[1]);
+                        if(i == kv[1]) {
+                            kv[1] = i;
+                        }
+                        props[kv[0]] = kv[1];
+                    } else {
+                        //malformed value.. let's ignore for now. 
+                        //This occurs when a string contains newline like following sample
+                        //CurrentTime = time()
+                        //ReceivedBytes = 9647680.000000
+                        //Message = "Error from glidein_3592@hansen-a005.rcac.purdue.edu: dprintf hit fatal errors
+                        //"
+                    }
+                });
+                callbacks.forEach(function(callback) {
+                    callback(props);
                 });
             }
         });
