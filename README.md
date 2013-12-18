@@ -58,7 +58,7 @@ eventlog.on() will be called for each classads posted. ads will look like follow
 Call unwatch() to stop listening on eventlog
 
 ```javascript
-eventlot.unwatch()
+eventlog.unwatch()
 ```
             
 

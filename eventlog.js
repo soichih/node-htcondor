@@ -10,7 +10,7 @@ exports.eventlog = {
     on: function(callback) {
         callbacks.push(callback);
     },
-    listen: function(path) {
+    watch: function(path) {
         //console.log("eventlog lister listening on "+path);
         tail = new Tail(path, "...\n", {interval: 500});
         tail.on("line", function(ablock) {
