@@ -21,6 +21,7 @@
     "url": "https://github.com/soichih/node-htcondor/issues"
     },
     "dependencies": {
+        "merge": "*",
         "tmp": "*",
         "tail": "*",
         "xml2js": "*"

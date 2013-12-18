@@ -2,7 +2,6 @@ var lib = require('./lib');
 var adparser = require('./lib').adparser;
 var spawn = require('child_process').spawn;
 var fs = require('fs');
-
 var tmp = require('tmp');
 
 function submit_exception(code, message) {
@@ -11,7 +10,7 @@ function submit_exception(code, message) {
     this.name = "submit_exception";
 }
 
-function addslashes( str ) {
+function addslashes(str) {
     return (str + '').replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
 }
 
@@ -36,6 +35,7 @@ exports.submit = function(submit_options, next) {
             }
         }
         out.end("\n");
+        console.log("submitted generated submit file:"+path);
 
         //submit!
         condor_submit = spawn('condor_submit', ['-verbose', path]);
@@ -64,7 +64,6 @@ exports.submit = function(submit_options, next) {
         });
 
     });
-    
 };
 
 /*
@@ -139,12 +138,5 @@ exports.query = function(query, callback) {
         }
     });
 }
-
-exports.watch = function(jobs, callback) {
-    for(var clusterid in jobs) {
-        jobs_watching[clusterid] = callback;
-    };
-}
-
 
 */
