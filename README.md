@@ -27,14 +27,14 @@ var eventlog = require('htcondor').eventlog
 eventlog.listen("/var/log/condor/EventLog");
 
 //and receive events
-eventlog.on(function(event) {
-    console.dir(event);
+eventlog.on(function(ads) {
+    console.dir(ads);
 });
 ````
 
-Currently, on() will capture all classad update event (eventid 28). You will receive an object that looks like
+eventlog.on() will be called for each classads posted. ads will look like following.
 
-```
+```javascript
 { _jobid: '49563264.000.000',
   _timestamp: '12/15 19:12:25',
   _updatetime: Sun Dec 15 2013 19:12:25 GMT+0000 (UTC),
@@ -54,6 +54,13 @@ Currently, on() will capture all classad update event (eventid 28). You will rec
   EventTypeNumber: 28,
   CurrentTime: 'time()' }
 ```
+
+Call unwatch() to stop listening on eventlog
+
+```javascript
+eventlot.unwatch()
+```
+            
 
 #job submitter
 
