@@ -23,8 +23,8 @@ EVENT_LOG_MAX_ROTATIONS = 5
 ```javascript
 var eventlog = require('htcondor').eventlog
 
-//you can start listening on your htcondor eventlog
-eventlog.listen("/var/log/condor/EventLog");
+//you can start watching on your htcondor eventlog
+eventlog.watch("/var/log/condor/EventLog");
 
 //and receive events
 eventlog.on(function(ads) {
@@ -33,6 +33,8 @@ eventlog.on(function(ads) {
 ````
 
 eventlog.on() will be called for each classads posted. ads will look like following.
+
+Why didn't I implement this more like fs.watch()? 2 reasons... You often need to start watch before you know which job id to watch (see submit sample below). Another reason is that, you usually don't have more than 1 EventLog, so there is no point of having multiple watcher watching the same log.
 
 ```javascript
 { _jobid: '49563264.000.000',
@@ -55,7 +57,7 @@ eventlog.on() will be called for each classads posted. ads will look like follow
   CurrentTime: 'time()' }
 ```
 
-Call unwatch() to stop listening on eventlog
+Call unwatch() to stop watchin on eventlog
 
 ```javascript
 eventlog.unwatch()
@@ -70,8 +72,8 @@ htcondor.submit() function submits to local condor queue and returns job ID, and
 var htcondor = require('htcondor');
 var eventlog = require('htcondor').eventlog
 
-//you can start listening on your htcondor eventlog
-eventlog.listen("/var/log/condor/EventLog");
+//you can start watching on your htcondor eventlog
+eventlog.watch("/var/log/condor/EventLog");
 
 htcondor.submit({
     universe: "vanilla",
@@ -106,7 +108,7 @@ htcondor.submit({
 
 ```
 
-In above sample, I have eventlog listening on the job ID that I just submitted, and wait for it to be terminated(or aborted).
+In above sample, I have eventlog watching on the job ID that I just submitted, and wait for it to be terminated(or aborted).
 
 #License
 MIT. Please see License file for more details.
