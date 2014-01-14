@@ -3,6 +3,7 @@ var adparser = require('./lib').adparser;
 var spawn = require('child_process').spawn;
 var fs = require('fs');
 var tmp = require('tmp');
+var Promise = require('promise');
 
 function submit_exception(code, message) {
     this.code = code;
@@ -14,56 +15,73 @@ function addslashes(str) {
     return (str + '').replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
 }
 
-exports.submit = function(submit_options, next) {
-    //write out submit file to temp file
-    tmp.file(function(err, path, fd) {
-        if (err) throw err;
-        //create submit file
-        var out = fs.createWriteStream(path);
-        for(key in submit_options) {
-            var value = submit_options[key];
-            switch(key) {
-            case "queue":
-                out.write("queue "+value+"\n"); break;
-            default:
-                if(key[0] == "+") {
-                    //+attribute needs to be quoted
-                    out.write(key+"=\""+addslashes(value)+"\"\n"); 
-                } else {
-                    out.write(key+"="+value+"\n");
+exports.submit = function(submit_options, callback) {
+    var promise = new Promise(function(resolve, reject) {
+
+        //create tmp file for submit file
+        tmp.file({keep: true}, function(err, submit_path) {
+            if (err) {
+                callback(err);
+                reject(err);
+            }
+
+            //create tmp file for job log
+            tmp.file({keep: true}, function(err, log_path) {
+                submit_options['log'] = log_path;
+
+                //create submit file
+                var out = fs.createWriteStream(submit_path);
+                for(key in submit_options) {
+                    var value = submit_options[key];
+                    switch(key) {
+                    case "queue":
+                        out.write("queue "+value+"\n");
+                        break;
+                    default:
+                        if(key[0] == "+") {
+                            //+attribute needs to be quoted
+                            out.write(key+"=\""+addslashes(value)+"\"\n"); 
+                        } else {
+                            out.write(key+"="+value+"\n");
+                        }
+                    }
                 }
-            }
-        }
-        out.end("\n");
-        console.log("submitted generated submit file:"+path);
+                out.end("\n");
+                console.log("submitted generated submit file:"+submit_path);
 
-        //submit!
-        condor_submit = spawn('condor_submit', ['-verbose', path]);
-        var stdout = "";
-        condor_submit.stdout.on('data', function (data) {
-            stdout += data;
-        });
-        var stderr = "";
-        condor_submit.stderr.on('data', function (data) {
-            stderr += data;
-        });
-        condor_submit.on('close', function (code) {
-            console.log(stderr);
-            if(code !== 0) {
-                console.log("condor_submit failed with code: "+code);
-            } else {
-                var lines = stdout.split("\n");
-                var empty = lines.shift();//condor_q returns empty line at the top..
-                var header = lines.shift(); //** Proc 49714580.0:
-                var header_tokens = header.split(" "); 
-                var jobid = header_tokens[2];
-                jobid = jobid.substring(0, jobid.length - 1).split(".");
-                var props = adparser.parse(lines);
-                next({Cluster: parseInt(jobid[0]), Proc: parseInt(jobid[1])}, props);
-            }
-        });
+                //submit!
+                condor_submit = spawn('condor_submit', ['-verbose', submit_path]);//, {cwd: __dirname});
+                var stdout = "";
+                condor_submit.stdout.on('data', function (data) {
+                    stdout += data;
+                });
+                var stderr = "";
+                condor_submit.stderr.on('data', function (data) {
+                    stderr += data;
+                });
+                condor_submit.on('close', function (code) {
+                    console.log(stderr);
+                    if(code !== 0) {
+                        console.log("condor_submit failed with code: "+code);
+                    } else {
+                        var lines = stdout.split("\n");
+                        var empty = lines.shift();//condor_q returns empty line at the top..
+                        var header = lines.shift(); //** Proc 49714580.0:
+                        var header_tokens = header.split(" "); 
+                        var jobid = header_tokens[2];
+                        jobid = jobid.substring(0, jobid.length - 1).split(".");
+                        var props = adparser.parse(lines);
+                        props._cluster = parseInt(jobid[0]);
+                        props._proc = parseInt(jobid[1]);
+                        callback(null, props);
+                        resolve(props);
+                    }
+                });
 
+            });
+        });
     });
+    return promise;
 };
 
 /*
