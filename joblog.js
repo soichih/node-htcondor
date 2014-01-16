@@ -1,6 +1,37 @@
-//var fs = require('fs');
-//var xml2js = require('xml2js');
+var Tail = require('tail').Tail;
 
+
+/*
+    on: function(callback) {
+        callbacks.push(callback);
+    },
+    watch: function(path) {
+        //console.log("eventlog lister listening on "+path);
+        tail = new Tail(path, "...\n", {interval: 500});
+        tail.on("line", function(ablock) {
+            var lines = ablock.split("\n");
+            var header = lines.shift();
+            var eventid =  parseInt(header.substring(0,3));
+            var props = {
+                _jobid: header.substring(5,21),
+                _timestamp: header.substring(23,37),
+                _updatetime: new Date()
+            };
+
+            if(eventid == 28) { //Job ad information event
+                //parse class ad key/value
+                var props = adparser.parse(lines);
+                callbacks.forEach(function(callback) {
+                    callback(props);
+                });
+            }
+        });
+    },
+    unwatch: function() {
+        tail.unwatch();
+    }
+}
+*/
 /*
 
 exports.query = function(query, callback) {

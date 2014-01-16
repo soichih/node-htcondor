@@ -21,7 +21,9 @@ exports.submit = function(submit_options, callback) {
         //create tmp file for submit file
         tmp.file({keep: true}, function(err, submit_path) {
             if (err) {
-                callback(err);
+                if(callback) {
+                    callback(err);
+                }
                 reject(err);
             }
 
@@ -73,7 +75,9 @@ exports.submit = function(submit_options, callback) {
                         var props = adparser.parse(lines);
                         props._cluster = parseInt(jobid[0]);
                         props._proc = parseInt(jobid[1]);
-                        callback(null, props);
+                        if(callback) {
+                            callback(null, props);
+                        }
                         resolve(props);
                     }
                 });

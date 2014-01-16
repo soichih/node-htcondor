@@ -6,7 +6,36 @@ To install:
 npm install htcondor
 ```
 
-#eventlog watcher
+## Submit jobs
+
+You can submit a condor job and watch for joblog.
+
+```
+var htcondor = require('htcondor');
+
+htcondor.submit({
+    universe: "vanilla",
+
+    executable: "/bin/uname",
+    arguments: "-a",
+    notification: "never",
+
+    shouldtransferfiles: "yes",
+    when_to_transfer_output: "ON_EXIT",
+    output: "stdout.txt",
+    error: stderr.txt",
+
+    "+ProjectName": "CSIU",
+    queue: 1
+}).then(function(joblog) {
+    //subscribe to joblog event (check for event.MyType to determine event type)
+}).done(function(err) {
+    if(err) throw err;
+});
+
+```
+
+## eventlog watcher
 
 This module allows you to subscribe to condor event log (usually at /var/log/condor/EventLog), and receive callbacks so that you can monitor job status or any other attribute changes.
 
