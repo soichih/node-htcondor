@@ -10,9 +10,7 @@ var XML = require('xml-simple');
 exports.Joblog = function(path) {
     var callbacks = this.callbacks = [];
 
-    //console.log("tailing");
     this.tail = new Tail(path, "</c>\n");
-    //console.log("tailing");
     this.tail.on("line", function(xml) {
         xml +="</c>";
         parse_jobxml(xml, function(event) {
@@ -22,6 +20,7 @@ exports.Joblog = function(path) {
             });
         });
     });
+    this.tail.unwatch(); //let user start watching
     
     function parse_attrvalue(attr) {
         if(attr.s) {
@@ -64,12 +63,11 @@ exports.Joblog = function(path) {
     };
 };
 exports.Joblog.prototype = {
-    event: function(call) {
-        //console.log("adding to callback");
+    watch: function(call) {
+        this.tail.watch();
         this.callbacks.push(call);
     },
     unwatch: function() {
-        //console.log("unwatching");
         this.tail.unwatch();
     }
 };
@@ -103,7 +101,8 @@ exports.submit = function(submit_options, callback) {
                     var value = submit_options[key];
                     switch(key) {
                     case "transfer_input_files":
-                        //TODO handle case when value is not array
+                    case "transfer_output_files":
+                        value = [].concat(value); //force it to array if it's not
                         out.write(key+"="+value.join(",")+"\n");
                         break;
                     case "queue":
@@ -122,21 +121,11 @@ exports.submit = function(submit_options, callback) {
                 out.write("queue "+queue+"\n");
                 out.end("\n", function() {
                     fs.close(submit_fd); //not sure if this is neede or not
-                    
-                    //console.log("submitted generated submit file:"+submit_path);
-
                     var joblog = new exports.Joblog(log_path);
 
                     //submit!
                     console.log("submit path:"+submit_path);
                     condor_submit = spawn('condor_submit', ['-verbose', submit_path]);//, {cwd: __dirname});
-
-                    //why can't I wait until submit actually succedds? because condor
-                    //publishes event at, or before submition succeeds. if we wait until
-                    //we get all submit result, the event is already published 
-                    //and client subscribing to submitevent will not hear from it.
-                    //(work around maybe to store the submit event until someone subscribes for it later..)
-                    resolve(joblog);
 
                     //load event
                     var stdout = "";
@@ -147,36 +136,91 @@ exports.submit = function(submit_options, callback) {
                     condor_submit.stderr.on('data', function (data) {
                         stderr += data;
                     });
-                    condor_submit.on('close', function (code) {
+                    //should I use exit instead of close?
+                    condor_submit.on('close', function (code, signal) {
                         if(code !== 0) {
                             console.log("submit failed with code:"+code);
                             console.log(stderr);
-                            throw stderr;
-                            //reject("condor_submit failed with code: "+code);
+                            reject("condor_submit failed with code: "+code);
                         } else {
-                            /*
                             //parse submit props
                             var lines = stdout.split("\n");
                             var empty = lines.shift();//condor_q returns empty line at the top..
                             var header = lines.shift(); //** Proc 49714580.0:
                             var header_tokens = header.split(" "); 
+
                             var jobid = header_tokens[2];
                             jobid = jobid.substring(0, jobid.length - 1).split(".");
+                            var id = {
+                                cluster: parseInt(jobid[0]),
+                                proc: parseInt(jobid[1])
+                            };
+
                             var props = adparser.parse(lines);
 
-                            props._Cluster = parseInt(jobid[0]);
-                            props._Proc = parseInt(jobid[1]);
-                            
-                            //now what do I do with this?
-                            */
+                            //a bit of fake to be props from xml joblog.. 
+                            //var jobid = jobid.substring(0, jobid.length - 1).split(".");
+
+                            //joblog.props.MyType = "SubmitEvent";
+                            resolve({id: id, props: props, options: submit_options, log: joblog});
                         }
                     });
                 });
-        
             });
         });
     });
     return promise.nodeify(callback);
+};
+
+//run simple condor command that takes job id as an argument
+function condor_simple(cmd, job, callback) {
+    var promise = new Promise(function(resolve, reject) {
+        //console.log("removing job:"+job.id);
+        //console.dir(job.id);
+
+        cmd = spawn(cmd, [job.id.cluster+"."+job.id.proc]);//, {cwd: __dirname});
+
+        //load event
+        var stdout = "";
+        cmd.stdout.on('data', function (data) {
+            stdout += data;
+        });
+        var stderr = "";
+        cmd.stderr.on('data', function (data) {
+            stderr += data;
+        });
+        cmd.on('error', function (err) {
+            console.dir(err);
+            console.log(stdout);
+            console.log(stderr);
+            reject(err);
+        });
+        cmd.on('exit', function (code, signal) {
+            //console.log(stdout);
+            //console.log(stderr);
+            if(code !== 0) {
+                console.log("condor_remove failed with code:"+code);
+                console.log(stdout);
+                console.log(stderr);
+                reject(code, signal);
+            } else {
+                resolve();
+            }
+        });
+    });
+    return promise.nodeify(callback);
+}
+
+exports.remove = function(job, callback) {
+    return condor_simple('condor_rm', job, callback);
+};
+
+exports.release = function(job, callback) {
+    return condor_simple('condor_release', job, callback);
+};
+
+exports.hold = function(job, callback) {
+    return condor_simple('condor_hold', job, callback);
 };
 
 exports.eventlog = {
