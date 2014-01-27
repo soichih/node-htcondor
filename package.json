@@ -1,6 +1,6 @@
 {
     "name": "htcondor",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "description": "nodejs hook for htcondor",
     "main": "index.js",
     "scripts": {
@@ -24,7 +24,7 @@
         "merge": "*",
         "tmp": "*",
         "tail": "*",
-        "xml2js": "*",
+        "xml-simple": "*",
         "promise": "latest"
     }
 }
