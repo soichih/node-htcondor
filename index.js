@@ -3,9 +3,12 @@ var lib = require('./lib');
 var adparser = require('./lib').adparser;
 var spawn = require('child_process').spawn;
 var fs = require('fs');
-var tmp = require('tmp');
+var temp = require('temp');
 var Promise = require('promise');
 var XML = require('xml-simple');
+
+// Automatically track and cleanup files at exit
+temp.track();
 
 exports.Joblog = function(path) {
     var callbacks = this.callbacks = [];
@@ -83,88 +86,79 @@ exports.submit = function(submit_options, callback) {
     }
 
     var promise = new Promise(function(resolve, reject) {
-        //create tmp file for submit file
-        tmp.file({keep: true}, function(err, submit_path, submit_fd) {
-            if (err) {
-                reject(err);
-            }
+        var submit = temp.createWriteStream('htcondor-submit.');
+        temp.open('htcondor-log.', function(err, log) {
+            submit_options['log'] = log.path;
+            submit_options['log_xml'] = "True";
 
-            //create tmp file for job log (xml)
-            tmp.file({keep: true}, function(err, log_path) {
-                submit_options['log'] = log_path;
-                submit_options['log_xml'] = "True";
-
-                //create submit file
-                var out = fs.createWriteStream(submit_path);
-                var queue = 1;
-                for(key in submit_options) {
-                    var value = submit_options[key];
-                    switch(key) {
-                    case "transfer_input_files":
-                    case "transfer_output_files":
-                        value = [].concat(value); //force it to array if it's not
-                        out.write(key+"="+value.join(",")+"\n");
-                        break;
-                    case "queue":
-                        //don't write out until the end
-                        queue = value;
-                        break;
-                    default:
-                        if(key[0] == "+") {
-                            //+attribute needs to be quoted
-                            out.write(key+"=\""+addslashes(value)+"\"\n");
-                        } else {
-                            out.write(key+"="+value+"\n");
-                        }
+            //output submit file
+            var queue = 1;
+            for(key in submit_options) {
+                var value = submit_options[key];
+                switch(key) {
+                case "transfer_input_files":
+                case "transfer_output_files":
+                    value = [].concat(value); //force it to array if it's not
+                    submit.write(key+"="+value.join(",")+"\n");
+                    break;
+                case "queue":
+                    //don't write out until the end
+                    queue = value;
+                    break;
+                default:
+                    if(key[0] == "+") {
+                        //+attribute needs to be quoted
+                        submit.write(key+"=\""+addslashes(value)+"\"\n");
+                    } else {
+                        submit.write(key+"="+value+"\n");
                     }
                 }
-                out.write("queue "+queue+"\n");
-                out.end("\n", function() {
-                    fs.close(submit_fd); //not sure if this is neede or not
-                    var joblog = new exports.Joblog(log_path);
+            }
+            submit.write("queue "+queue+"\n");
+            submit.end("\n", function() {
+                var joblog = new exports.Joblog(log.path);
 
-                    //submit!
-                    console.log("submit path:"+submit_path);
-                    condor_submit = spawn('condor_submit', ['-verbose', submit_path]);//, {cwd: __dirname});
+                //submit!
+                console.log("submit path:"+submit.path);
+                condor_submit = spawn('condor_submit', ['-verbose', submit.path]);//, {cwd: __dirname});
 
-                    //load event
-                    var stdout = "";
-                    condor_submit.stdout.on('data', function (data) {
-                        stdout += data;
-                    });
-                    var stderr = "";
-                    condor_submit.stderr.on('data', function (data) {
-                        stderr += data;
-                    });
-                    //should I use exit instead of close?
-                    condor_submit.on('close', function (code, signal) {
-                        if(code !== 0) {
-                            console.log("submit failed with code:"+code);
-                            console.log(stderr);
-                            reject("condor_submit failed with code: "+code);
-                        } else {
-                            //parse submit props
-                            var lines = stdout.split("\n");
-                            var empty = lines.shift();//condor_q returns empty line at the top..
-                            var header = lines.shift(); //** Proc 49714580.0:
-                            var header_tokens = header.split(" "); 
+                //load event
+                var stdout = "";
+                condor_submit.stdout.on('data', function (data) {
+                    stdout += data;
+                });
+                var stderr = "";
+                condor_submit.stderr.on('data', function (data) {
+                    stderr += data;
+                });
+                //should I use exit instead of close?
+                condor_submit.on('close', function (code, signal) {
+                    if(code !== 0) {
+                        console.log("submit failed with code:"+code);
+                        console.log(stderr);
+                        reject("condor_submit failed with code: "+code);
+                    } else {
+                        //parse submit props
+                        var lines = stdout.split("\n");
+                        var empty = lines.shift();//condor_q returns empty line at the top..
+                        var header = lines.shift(); //** Proc 49714580.0:
+                        var header_tokens = header.split(" "); 
 
-                            var jobid = header_tokens[2];
-                            jobid = jobid.substring(0, jobid.length - 1).split(".");
-                            var id = {
-                                cluster: parseInt(jobid[0]),
-                                proc: parseInt(jobid[1])
-                            };
+                        var jobid = header_tokens[2];
+                        jobid = jobid.substring(0, jobid.length - 1).split(".");
+                        var id = {
+                            cluster: parseInt(jobid[0]),
+                            proc: parseInt(jobid[1])
+                        };
 
-                            var props = adparser.parse(lines);
+                        var props = adparser.parse(lines);
 
-                            //a bit of fake to be props from xml joblog.. 
-                            //var jobid = jobid.substring(0, jobid.length - 1).split(".");
+                        //a bit of fake to be props from xml joblog.. 
+                        //var jobid = jobid.substring(0, jobid.length - 1).split(".");
 
-                            //joblog.props.MyType = "SubmitEvent";
-                            resolve({id: id, props: props, options: submit_options, log: joblog});
-                        }
-                    });
+                        //joblog.props.MyType = "SubmitEvent";
+                        resolve({id: id, props: props, options: submit_options, log: joblog});
+                    }
                 });
             });
         });
