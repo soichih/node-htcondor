@@ -6,9 +6,105 @@ To install:
 npm install htcondor
 ```
 
-#eventlog watcher
+## Submit jobs
+
+You can submit a condor job and watch for joblog.
+
+```
+var htcondor = require('htcondor');
+
+//create condor submit object
+var submit_options = {
+    universe: "vanilla",
+    executable: "test.sh",
+    arguments: "hello",
+    notification: "never",
+
+    //transfer_output_files: 'bogus',
+
+    shouldtransferfiles: "yes",
+    when_to_transfer_output: "ON_EXIT",
+    output: "stdout.txt",
+    error: "stderr.txt",
+    queue: 1
+};
+
+//submit to start the job
+htcondor.submit(submit_options).then(function(job) {
+    console.log("Submitted");
+
+    //you can dump the condor submit property for your new job
+    //console.dir(job.props);
+
+    //job.id contains cluster/proc ids
+    //console.dir(job.id);
+
+    //you can *watch* job log
+    job.log.watch(function(event) {
+        switch(event.MyType) {
+
+        //normal status type events (just display content)
+        case "SubmitEvent":
+        case "ExecuteEvent":
+        case "JobImageSizeEvent":
+            console.log(event.MyType);
+            break;
+
+        //critical events
+        case "ShadowExceptionEvent":
+            console.log(event.MyType);
+            console.dir(event);
+
+            //I now stop the watcher (ends this submission)
+            job.log.unwatch();
+            break;
+
+        //job ended normally
+        case "JobTerminatedEvent":
+            console.log(event.MyType);
+            console.dir(event);
+
+            //Do something based on the ReturnValue (resubmit, submit different job, etc..)
+            console.log("return value:"+event.ReturnValue);
+            job.log.unwatch();
+            break;
+
+        //you might want to provide default in case of other events..
+        default:
+            console.log(event.MyType);
+            console.log("unknown event type.. stop watching");
+            job.log.unwatch();
+        }
+    });
+});
+
+```
+
+You can do the usual condor stuff.
+
+```
+htcondor.remove(job).then(function() {
+    console.log("successfully removed job");
+});
+```
+
+```
+htcondor.hold(job).then(function() {
+    console.log("successfully held job");
+});
+```
+
+```
+htcondor.release(job).then(function() {
+    console.log("successfully released job");
+});
+```
+
+## eventlog watcher
 
 This module allows you to subscribe to condor event log (usually at /var/log/condor/EventLog), and receive callbacks so that you can monitor job status or any other attribute changes.
+
+If you are monitoring jobs that you submit, then you can just watch the job log instead(See above). eventlog watcher is to monitor the entire cluster.
 
 Obviously though.. you need to have EventLog enabled on your condor installation. You need to have something like following in your condor config.d if you don't see your EventLog generated already.
 
@@ -63,52 +159,5 @@ Call unwatch() to stop watchin on eventlog
 eventlog.unwatch()
 ```
             
-
-#job submitter
-
-htcondor.submit() function submits to local condor queue and returns job ID, and all classads generated for your job.
-
-```javascript
-var htcondor = require('htcondor');
-var eventlog = require('htcondor').eventlog
-
-//you can start watching on your htcondor eventlog
-eventlog.watch("/var/log/condor/EventLog");
-
-htcondor.submit({
-    universe: "vanilla",
-    //universe: "local",
-    executable: "test.sh",
-    //notification: "never",
-    shouldtransferfiles: "yes",
-    when_to_transfer_output: "ON_EXIT",
-    input: "test.dat",
-    output: "test.out",
-    error: "test.out",
-    log: "test.log",
-    //"+ProjectName": "OSG-Staff",
-    "+ProjectName": "CSIU",
-    queue: 1
-}, function(jobid, ads) {
-    //console.log("successfully submitted the job with following classad attributes");
-    //console.dir(jobid);
-    //console.dir(ads);
-
-    eventlog.on(function(ads) {
-        if(ads.Cluster == jobid.Cluster) {
-            console.log(ads);
-            switch(ads.TriggerEventTypeName) {
-            case "ULOG_JOB_TERMINATED":
-            case "ULOG_JOB_ABORTED":
-                eventlog.unwatch();
-            }
-        }
-    });
-});
-
-```
-
-In above sample, I have eventlog watching on the job ID that I just submitted, and wait for it to be terminated(or aborted).
-
 #License
 MIT. Please see License file for more details.
