@@ -1,8 +1,10 @@
+var fs = require('fs');
+var spawn = require('child_process').spawn;
+
 var Tail = require('tail').Tail;
 var lib = require('./lib');
 var adparser = require('./lib').adparser;
-var spawn = require('child_process').spawn;
-var fs = require('fs');
+
 var temp = require('temp');
 var Promise = require('promise');
 var XML = require('xml-simple');
@@ -225,6 +227,7 @@ exports.eventlog = {
     },
     watch: function(path) {
         //console.log("eventlog lister listening on "+path);
+        var $this = this;
         this.tail = new Tail(path, "...\n", {interval: 500});
         this.tail.on("line", function(ablock) {
             var lines = ablock.split("\n");
@@ -239,7 +242,7 @@ exports.eventlog = {
             if(eventid == 28) { //Job ad information event
                 //parse class ad key/value
                 var props = adparser.parse(lines);
-                this.callbacks.forEach(function(callback) {
+                $this.callbacks.forEach(function(callback) {
                     callback(props);
                 });
             }
