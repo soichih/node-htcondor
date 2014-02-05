@@ -26,10 +26,8 @@ exports.adparser = {
         var props = {};
         lines.forEach(function(line) {
             if(line == "") return;
-            var kv = line.split(" = ");
-            if(kv.length == 2) {
-                props[kv[0]] = exports.adparser.parse_value(kv[1]);
-            } else {
+            var dpos = line.indexOf(" = ");
+            if(dpos == -1) {
                 console.log("malformed value.. ignoring");
                 console.log(line);
                 //This occurs when a string contains newline like following sample
@@ -37,6 +35,10 @@ exports.adparser = {
                 //ReceivedBytes = 9647680.000000
                 //Message = "Error from glidein_3592@hansen-a005.rcac.purdue.edu: dprintf hit fatal errors
                 //"
+            } else {
+                var key = line.substring(0, dpos);
+                var value = line.substring(dpos+3);
+                props[key] = exports.adparser.parse_value(value);
             }
         });
         return props;

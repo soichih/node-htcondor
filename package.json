@@ -1,6 +1,6 @@
 {
     "name": "htcondor",
-    "version": "0.0.8",
+    "version": "0.0.9",
     "description": "nodejs hook for htcondor",
     "main": "index.js",
     "scripts": {
