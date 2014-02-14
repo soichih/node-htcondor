@@ -25,6 +25,6 @@
         "temp": "*",
         "tail": "*",
         "xml-simple": "*",
-        "promise": "latest"
+        "promise": "*"
     }
 }
