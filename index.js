@@ -37,16 +37,22 @@ function parse_attrvalue(attr) {
 exports.Joblog = function(path) {
     var callbacks = this.callbacks = [];
 
+    console.log("tailing joblog "+path);
     this.tail = new Tail(path, "</c>\n");
     this.tail.on("line", function(xml) {
         xml +="</c>";
         parse_jobxml(xml, function(event) {
+            if(callbacks.length == 0) {
+                //I will never catch SubmitEvent, since the callback isn't registered until 
+                //after submission completes... But they get the job object which contains
+                //pretty much the same info..
+            }
             callbacks.forEach(function(callback) {
                 callback(event);
             });
         });
     });
-    this.tail.unwatch(); //let user start watching
+    //this.tail.unwatch(); //let user start watching
 
     function parse_jobxml(xml, callback) {
         XML.parse(xml, function(err, attrs) {
@@ -66,8 +72,8 @@ exports.Joblog = function(path) {
     };
 };
 exports.Joblog.prototype = {
-    watch: function(call) {
-        this.tail.watch();
+    onevent: function(call) {
+        //this.tail.watch();
         this.callbacks.push(call);
     },
     unwatch: function() {
