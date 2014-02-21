@@ -52,7 +52,6 @@ exports.Joblog = function(path) {
             });
         });
     });
-    //this.tail.unwatch(); //let user start watching
 
     function parse_jobxml(xml, callback) {
         XML.parse(xml, function(err, attrs) {
@@ -73,7 +72,7 @@ exports.Joblog = function(path) {
 };
 exports.Joblog.prototype = {
     onevent: function(call) {
-        //this.tail.watch();
+        //console.log("registering on event");
         this.callbacks.push(call);
     },
     unwatch: function() {
@@ -125,11 +124,12 @@ exports.submit = function(submit_options, callback) {
             submit.end("\n", function() {
                 var joblog = new exports.Joblog(log.path);
 
-                //debug
-                console.log("submit path:"+submit.path);
-                fs.readFile(submit.path, 'utf8', function(err, data) {
-                    console.log(data);
-                });
+                if(submit_options.debug) {
+                    console.log("submit path:"+submit.path);
+                    fs.readFile(submit.path, 'utf8', function(err, data) {
+                        console.log(data);
+                    });
+                }
 
                 //submit!
                 condor_submit = spawn('condor_submit', ['-verbose', submit.path]);//, {cwd: __dirname});
@@ -146,8 +146,8 @@ exports.submit = function(submit_options, callback) {
                 //should I use exit instead of close?
                 condor_submit.on('close', function (code, signal) {
                     if(code !== 0) {
-                        console.log("submit failed with code:"+code);
-                        console.log(stderr);
+                        console.error("submit failed with code:"+code);
+                        console.error(stderr);
                         reject("condor_submit failed with code: "+code);
                     } else {
                         //parse submit props
@@ -205,18 +205,18 @@ function condor_simple(cmd, opts) {
     });
 }
 
-exports.remove = function(job, callback) {
-    return condor_simple('condor_rm', [job.id]).nodeify(callback);
+exports.remove = function(id, callback) {
+    return condor_simple('condor_rm', [id]).nodeify(callback);
 };
-exports.release = function(job, callback) {
-    return condor_simple('condor_release', [job.id]).nodeify(callback);
+exports.release = function(id, callback) {
+    return condor_simple('condor_release', [id]).nodeify(callback);
 };
-exports.hold = function(job, callback) {
-    return condor_simple('condor_hold', [job.id]).nodeify(callback);
+exports.hold = function(id, callback) {
+    return condor_simple('condor_hold', [id]).nodeify(callback);
 };
-exports.q = function(job, callback) {
+exports.q = function(id, callback) {
     return new Promise(function(resolve, reject) {
-        condor_simple('condor_q', [job.id, '-long', '-xml']).then(function(stdout, stderr) {
+        condor_simple('condor_q', [id, '-long', '-xml']).then(function(stdout, stderr) {
             //parse condor_q output
             XML.parse(stdout, function(err, attrs) {
                 if(err) {
