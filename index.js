@@ -6,7 +6,7 @@ var lib = require('./lib');
 var adparser = require('./lib').adparser;
 
 var temp = require('temp');
-var Promise = require('promise');
+var Q = require('q');
 var XML = require('xml-simple');
 
 // Automatically track and cleanup files at exit
@@ -37,7 +37,7 @@ function parse_attrvalue(attr) {
 exports.Joblog = function(path) {
     var callbacks = this.callbacks = [];
 
-    console.log("tailing joblog "+path);
+    //console.log("tailing joblog "+path);
     this.tail = new Tail(path, "</c>\n");
     this.tail.on("line", function(xml) {
         xml +="</c>";
@@ -80,129 +80,128 @@ exports.Joblog.prototype = {
     }
 };
 
-exports.submit = function(submit_options, callback) {
-    //console.dir(submit_options);
-    function submit_exception(code, message) {
-        this.code = code;
-        this.message = message;
-        this.name = "submit_exception";
-    }
-    function addslashes(str) {
-        return (str + '').replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
-    }
+function addslashes(str) {
+    return (str + '').replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
+}
 
-    return new Promise(function(resolve, reject) {
-        var submit = temp.createWriteStream('htcondor-submit.');
-        temp.open('htcondor-log.', function(err, log) {
-            submit_options['log'] = log.path;
-            submit_options['log_xml'] = "True";
+exports.submit = function(submit_options) {
+    var deferred = Q.defer();
 
-            //output submit file
-            var queue = 1;
-            for(key in submit_options) {
-                var value = submit_options[key];
-                switch(key) {
-                case "transfer_input_files":
-                case "transfer_output_files":
-                    value = [].concat(value); //force it to array if it's not
-                    submit.write(key+"="+value.join(",")+"\n");
-                    break;
-                case "queue":
-                    //don't write out until the end
-                    queue = value;
-                    break;
-                default:
-                    if(key[0] == "+") {
-                        //+attribute needs to be quoted
-                        submit.write(key+"=\""+addslashes(value)+"\"\n");
-                    } else {
-                        submit.write(key+"="+value+"\n");
-                    }
+    var submit = temp.createWriteStream('htcondor-submit.');
+    temp.open('htcondor-log.', function(err, log) {
+        submit_options['log'] = log.path;
+        submit_options['log_xml'] = "True";
+
+        //output submit file
+        var queue = 1;
+        for(key in submit_options) {
+            var value = submit_options[key];
+            switch(key) {
+            case "transfer_input_files":
+            case "transfer_output_files":
+                value = [].concat(value); //force it to array if it's not
+                submit.write(key+"="+value.join(",")+"\n");
+                break;
+            case "queue":
+                //don't write out until the end
+                queue = value;
+                break;
+            default:
+                if(key[0] == "+") {
+                    //+attribute needs to be quoted
+                    submit.write(key+"=\""+addslashes(value)+"\"\n");
+                } else {
+                    submit.write(key+"="+value+"\n");
                 }
             }
-            submit.write("queue "+queue+"\n");
-            submit.end("\n", function() {
-                var joblog = new exports.Joblog(log.path);
+        }
+        submit.write("queue "+queue+"\n");
+        submit.end("\n", function() {
+            //start watching joblog before submitting job
+            var joblog = new exports.Joblog(log.path);
 
-                if(submit_options.debug) {
-                    console.log("submit path:"+submit.path);
-                    fs.readFile(submit.path, 'utf8', function(err, data) {
-                        console.log(data);
+            if(submit_options.debug) {
+                console.log("submit path:"+submit.path);
+                fs.readFile(submit.path, 'utf8', function(err, data) {
+                    console.log(data);
+                });
+            }
+
+            //submit!
+            condor_submit = spawn('condor_submit', ['-verbose', submit.path]);//, {cwd: __dirname});
+
+            //load event
+            var stdout = "";
+            condor_submit.stdout.on('data', function (data) {
+                stdout += data;
+            });
+            var stderr = "";
+            condor_submit.stderr.on('data', function (data) {
+                stderr += data;
+            });
+            //should I use exit instead of close?
+            condor_submit.on('close', function (code, signal) {
+                if(code !== 0) {
+                    console.error("submit failed with code:"+code);
+                    console.error(stdout);
+                    console.error(stderr);
+                    joblog.unwatch();
+                    deferred.reject("condor_submit failed with code: "+code);
+                } else {
+                    //parse submit props
+                    var lines = stdout.split("\n");
+                    var empty = lines.shift();//condor_q returns empty line at the top..
+                    var header = lines.shift(); //** Proc 49714580.0:
+                    var header_tokens = header.split(" "); 
+                    var jobid = header_tokens[2];
+                    jobid = jobid.substring(0, jobid.length - 1); //remove last :
+                    //jobid = jobid.split(".");
+                    deferred.resolve({
+                        //creating "job" object
+                        id: jobid,
+                        props: adparser.parse(lines), 
+                        options: submit_options, 
+                        log: joblog
                     });
                 }
-
-                //submit!
-                condor_submit = spawn('condor_submit', ['-verbose', submit.path]);//, {cwd: __dirname});
-
-                //load event
-                var stdout = "";
-                condor_submit.stdout.on('data', function (data) {
-                    stdout += data;
-                });
-                var stderr = "";
-                condor_submit.stderr.on('data', function (data) {
-                    stderr += data;
-                });
-                //should I use exit instead of close?
-                condor_submit.on('close', function (code, signal) {
-                    if(code !== 0) {
-                        console.error("submit failed with code:"+code);
-                        console.error(stderr);
-                        reject("condor_submit failed with code: "+code);
-                    } else {
-                        //parse submit props
-                        var lines = stdout.split("\n");
-                        var empty = lines.shift();//condor_q returns empty line at the top..
-                        var header = lines.shift(); //** Proc 49714580.0:
-                        var header_tokens = header.split(" "); 
-                        var jobid = header_tokens[2];
-                        jobid = jobid.substring(0, jobid.length - 1); //remove last :
-                        //jobid = jobid.split(".");
-                        resolve({
-                            //creating "job" object
-                            id: jobid,
-                            props: adparser.parse(lines), 
-                            options: submit_options, 
-                            log: joblog
-                        });
-                    }
-                });
             });
         });
-    }).nodeify(callback);
+    });
+    return deferred.promise;
 };
 
 //run simple condor command that takes job id as an argument
 function condor_simple(cmd, opts) {
-    return new Promise(function(resolve, reject) {
-        cmd = spawn(cmd, opts);//, {cwd: __dirname});
+    var deferred = Q.defer();
 
-        //load event
-        var stdout = "";
-        cmd.stdout.on('data', function (data) {
-            stdout += data;
-        });
-        var stderr = "";
-        cmd.stderr.on('data', function (data) {
-            stderr += data;
-        });
-        cmd.on('error', function (err) {
-            console.dir(err);
+    cmd = spawn(cmd, opts);//, {cwd: __dirname});
+
+    //load event
+    var stdout = "";
+    cmd.stdout.on('data', function (data) {
+        stdout += data;
+    });
+    var stderr = "";
+    cmd.stderr.on('data', function (data) {
+        stderr += data;
+    });
+    cmd.on('error', function (err) {
+        console.dir(err);
+        console.error(stderr);
+        console.log(stdout);
+        deferred.reject(err);
+    });
+    cmd.on('exit', function (code, signal) {
+        if(code !== 0) {
+            console.error(cmd+" failed with code:"+code);
             console.error(stderr);
             console.log(stdout);
-            reject(err);
-        });
-        cmd.on('exit', function (code, signal) {
-            if(code !== 0) {
-                console.error(cmd+" failed with code:"+code);
-                console.error(stderr);
-                console.log(stdout);
-                reject(code, signal);
-            } else {
-                resolve(stdout, stderr);
-            }
-        });
+            deferred.reject(code, signal);
+        } else {
+            deferred.resolve(stdout, stderr);
+        }
     });
+    return deferred.promise;
 }
 
 exports.remove = function(id, callback) {
@@ -215,24 +214,25 @@ exports.hold = function(id, callback) {
     return condor_simple('condor_hold', [id]).nodeify(callback);
 };
 exports.q = function(id, callback) {
-    return new Promise(function(resolve, reject) {
-        condor_simple('condor_q', [id, '-long', '-xml']).then(function(stdout, stderr) {
-            //parse condor_q output
-            XML.parse(stdout, function(err, attrs) {
-                if(err) {
-                    console.error(err);
-                    reject(err);
-                } else if(attrs) {
-                    var events = {};
-                    attrs.c.a.forEach(function(attr) {
-                        var name = attr['@'].n;
-                        events[name] = parse_attrvalue(attr);
-                    }); 
-                    resolve(events);
-                }
-            });
+    var deferred = Q.defer();
+    condor_simple('condor_q', [id, '-long', '-xml']).then(function(stdout, stderr) {
+        //parse condor_q output
+        XML.parse(stdout, function(err, attrs) {
+            if(err) {
+                console.error(err);
+                deferred.reject(err);
+            } else if(attrs) {
+                var events = {};
+                attrs.c.a.forEach(function(attr) {
+                    var name = attr['@'].n;
+                    events[name] = parse_attrvalue(attr);
+                }); 
+                deferred.resolve(events);
+            }
         });
-    }).nodeify(callback);
+    });
+    deferred.promise.nodeify(callback);
+    return deferred.promise;
 };
 
 exports.eventlog = {
