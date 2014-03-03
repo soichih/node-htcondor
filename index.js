@@ -174,24 +174,24 @@ exports.submit = function(submit_options) {
 function condor_simple(cmd, opts) {
     var deferred = Q.defer();
 
-    cmd = spawn(cmd, opts);//, {cwd: __dirname});
+    var p = spawn(cmd, opts);//, {cwd: __dirname});
 
     //load event
     var stdout = "";
-    cmd.stdout.on('data', function (data) {
+    p.stdout.on('data', function (data) {
         stdout += data;
     });
     var stderr = "";
-    cmd.stderr.on('data', function (data) {
+    p.stderr.on('data', function (data) {
         stderr += data;
     });
-    cmd.on('error', function (err) {
+    p.on('error', function (err) {
         console.dir(err);
         console.error(stderr);
         console.log(stdout);
         deferred.reject(err);
     });
-    cmd.on('exit', function (code, signal) {
+    p.on('exit', function (code, signal) {
         if(code !== 0) {
             console.error(cmd+" failed with code:"+code);
             console.error(stderr);
@@ -204,8 +204,18 @@ function condor_simple(cmd, opts) {
     return deferred.promise;
 }
 
-exports.remove = function(id, callback) {
-    return condor_simple('condor_rm', [id]).nodeify(callback);
+exports.remove = function(opts, callback) {
+    return condor_simple('condor_rm', opts).nodeify(callback);
+    /*
+    if(typeof id === 'array') {
+        console.log("array given. passing everything");
+        console.dir(id);
+        return condor_simple('condor_rm', id).nodeify(callback);
+    } else {
+        //must be a single id
+        return condor_simple('condor_rm', [id]).nodeify(callback);
+    }
+    */
 };
 exports.release = function(id, callback) {
     return condor_simple('condor_release', [id]).nodeify(callback);
