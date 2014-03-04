@@ -102,10 +102,18 @@ exports.submit = function(submit_options) {
                 value = [].concat(value); //force it to array if it's not
                 submit.write(key+"="+value.join(",")+"\n");
                 break;
+
             case "queue":
                 //don't write out until the end
                 queue = value;
                 break;
+
+            //need to be quoted
+            case "on_exit_hold_reason":
+            case "periodic_hold_reason":
+                submit.write(key+"=\""+addslashes(value)+"\"\n");
+                break;
+
             default:
                 if(key[0] == "+") {
                     //+attribute needs to be quoted
@@ -205,6 +213,8 @@ function condor_simple(cmd, opts) {
 }
 
 exports.remove = function(opts, callback) {
+    //console.log("calling condor_rm");
+    //console.dir(opts);
     return condor_simple('condor_rm', opts).nodeify(callback);
     /*
     if(typeof id === 'array') {
