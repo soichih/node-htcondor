@@ -234,8 +234,40 @@ exports.hold = function(id, callback) {
     return condor_simple('condor_hold', [id]).nodeify(callback);
 };
 exports.q = function(id, callback) {
+    //console.log("condor_q -long -xml "+id);
     var deferred = Q.defer();
     condor_simple('condor_q', [id, '-long', '-xml']).then(function(stdout, stderr) {
+        //parse condor_q output
+        XML.parse(stdout, function(err, attrs) {
+            if(err) {
+                console.error(err);
+                deferred.reject(err);
+            } else if(attrs) {
+                //console.log("test.............................");
+                //console.dir(attrs);
+                if(!attrs.c) {
+                    deferred.reject("failed to load condor_q attrs");
+                    console.log(JSON.stringify(attrs, null, 2));
+                } else {
+                    var events = {};
+                    attrs.c.a.forEach(function(attr) {
+                        var name = attr['@'].n;
+                        events[name] = parse_attrvalue(attr);
+                    }); 
+                    deferred.resolve(events);
+                }
+            }
+        });
+    });
+    deferred.promise.nodeify(callback);
+    return deferred.promise;
+};
+
+/* condor_history blocks!!!! WHY!
+exports.history = function(id, callback) {
+    //console.log("condor_q -long -xml "+id);
+    var deferred = Q.defer();
+    condor_simple('condor_history', [id, '-long', '-xml']).then(function(stdout, stderr) {
         //parse condor_q output
         XML.parse(stdout, function(err, attrs) {
             if(err) {
@@ -254,6 +286,7 @@ exports.q = function(id, callback) {
     deferred.promise.nodeify(callback);
     return deferred.promise;
 };
+*/
 
 exports.eventlog = {
     tail: null,
