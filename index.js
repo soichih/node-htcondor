@@ -1,5 +1,6 @@
 var fs = require('fs');
 var spawn = require('child_process').spawn;
+var extend = require('util')._extend;
 
 var Tail = require('tail').Tail;
 var lib = require('./lib');
@@ -84,11 +85,16 @@ function addslashes(str) {
     return (str + '').replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0');
 }
 
-exports.submit = function(submit_options) {
+exports.submit = function(submit_options, config) {
     var deferred = Q.defer();
 
-    var submit = temp.createWriteStream('htcondor-submit.');
-    temp.open('htcondor-log.', function(err, log) {
+    //set default config
+    config = extend({
+        tmpdir: '/tmp'
+    }, config);
+
+    var submit = temp.createWriteStream({dir: config.tmpdir, prefix:'htcondor-submit.'});
+    temp.open({dir: config.tmpdir, prefix:'htcondor-log.'}, function(err, log) {
         submit_options['log'] = log.path;
         submit_options['log_xml'] = "True";
 
