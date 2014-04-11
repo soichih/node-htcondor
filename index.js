@@ -199,18 +199,12 @@ function condor_simple(cmd, opts) {
     p.stderr.on('data', function (data) {
         stderr += data;
     });
-    p.on('error', function (err) {
-        console.dir(err);
-        console.error(stderr);
-        console.log(stdout);
-        deferred.reject(err);
-    });
+    p.on('error', deferred.reject);
     p.on('exit', function (code, signal) {
-        if(code !== 0) {
-            console.error(cmd+" failed with code:"+code);
-            console.error(stderr);
-            console.log(stdout);
-            deferred.reject(code, signal);
+        if (signal) {
+            deferred.reject(cmd+ " was killed by signal "+ signal);
+        } else if (code !== 0) {
+            deferred.reject(cmd+ " failed with exit code "+ code+ "\nSTDERR:"+ stderr + "\nSTDOUT:"+ stdout);
         } else {
             deferred.resolve(stdout, stderr);
         }
@@ -246,25 +240,38 @@ exports.q = function(id, callback) {
         //parse condor_q output
         XML.parse(stdout, function(err, attrs) {
             if(err) {
-                console.error(err);
                 deferred.reject(err);
             } else if(attrs) {
-                //console.log("test.............................");
-                //console.dir(attrs);
-                if(!attrs.c) {
-                    deferred.reject("failed to load condor_q attrs");
-                    console.log(JSON.stringify(attrs, null, 2));
+
+                if (!attrs.c) {
+                    if (id) //the requested job was not found... error
+                        deferred.reject("Query for job "+id+" returned nothing");
+                    else //no query was specified => there are no jobs
+                        deferred.resolve([]);
                 } else {
-                    var events = {};
-                    attrs.c.a.forEach(function(attr) {
-                        var name = attr['@'].n;
-                        events[name] = parse_attrvalue(attr);
-                    }); 
-                    deferred.resolve(events);
+                
+                    //if not array, wrap in array
+                    var cs=Array.isArray(attrs.c)? attrs.c: [attrs.c];
+                
+                    var jobs=cs.map(function(c) {
+                    
+                        var events = {};
+                        c.a.forEach(function(attr) {
+                            var name = attr['@'].n;
+                            events[name] = parse_attrvalue(attr);
+                        });
+                        return events;
+                    });
+
+                    //return one single job if only one was requested
+                    if(id && jobs.length>0)
+                        deferred.resolve(jobs[0]);
+                    else //return an array of jobs otherwise
+                        deferred.resolve(jobs);
                 }
             }
         });
-    });
+    }, deferred.reject);
     deferred.promise.nodeify(callback);
     return deferred.promise;
 };
