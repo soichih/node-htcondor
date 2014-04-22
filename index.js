@@ -200,7 +200,7 @@ function condor_simple(cmd, opts) {
         stderr += data;
     });
     p.on('error', deferred.reject);
-    p.on('exit', function (code, signal) {
+    p.on('close', function (code, signal) {
         if (signal) {
             deferred.reject(cmd+ " was killed by signal "+ signal);
         } else if (code !== 0) {
@@ -236,7 +236,12 @@ exports.hold = function(id, callback) {
 exports.q = function(id, callback) {
     //console.log("condor_q -long -xml "+id);
     var deferred = Q.defer();
-    condor_simple('condor_q', [id, '-long', '-xml']).then(function(stdout, stderr) {
+    
+    var args=['-long', '-xml'];
+    if(id)
+        args.push(id);
+    
+    condor_simple('condor_q', args).then(function(stdout, stderr) {
         //parse condor_q output
         XML.parse(stdout, function(err, attrs) {
             if(err) {
