@@ -281,6 +281,14 @@ exports.q = function(id, callback) {
     return deferred.promise;
 };
 
+exports.drain = function(id, opts, callback) {
+
+    opts=opts||[];
+    opts.push(id);
+
+    return condor_simple('condor_drain', opts).nodeify(callback);
+};
+
 /* condor_history blocks!!!! WHY!
 exports.history = function(id, callback) {
     //console.log("condor_q -long -xml "+id);
