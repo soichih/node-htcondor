@@ -10,8 +10,17 @@ var temp = require('temp');
 var Q = require('q');
 var XML = require('xml-simple');
 
+var path = require('path');
+
 // Automatically track and cleanup files at exit
 temp.track();
+
+// Configuration for the module
+exports.config = {
+    condorLocation: "",
+    condorConfig: ""
+}
+
 
 function parse_attrvalue(attr) {
     if(attr.s) {
@@ -44,7 +53,7 @@ exports.Joblog = function(path) {
         xml +="</c>";
         parse_jobxml(xml, function(event) {
             if(callbacks.length == 0) {
-                //I will never catch SubmitEvent, since the callback isn't registered until 
+                //I will never catch SubmitEvent, since the callback isn't registered until
                 //after submission completes... But they get the job object which contains
                 //pretty much the same info..
             }
@@ -65,7 +74,7 @@ exports.Joblog = function(path) {
                 attrs.a.forEach(function(attr) {
                     var name = attr['@'].n;
                     event[name] = parse_attrvalue(attr);
-                }); 
+                });
                 callback(event);
             }
         });
@@ -166,15 +175,15 @@ exports.submit = function(submit_options, config) {
                     var lines = stdout.split("\n");
                     var empty = lines.shift();//condor_q returns empty line at the top..
                     var header = lines.shift(); //** Proc 49714580.0:
-                    var header_tokens = header.split(" "); 
+                    var header_tokens = header.split(" ");
                     var jobid = header_tokens[2];
                     jobid = jobid.substring(0, jobid.length - 1); //remove last :
                     //jobid = jobid.split(".");
                     deferred.resolve({
                         //creating "job" object
                         id: jobid,
-                        props: adparser.parse(lines), 
-                        options: submit_options, 
+                        props: adparser.parse(lines),
+                        options: submit_options,
                         log: joblog
                     });
                 }
@@ -188,7 +197,9 @@ exports.submit = function(submit_options, config) {
 function condor_simple(cmd, opts) {
     var deferred = Q.defer();
 
-    var p = spawn(cmd, opts);//, {cwd: __dirname});
+    process.env['CONDOR_CONFIG'] = exports.config['condorConfig'];
+    console.log("condorLocation = " + exports.config['condorLocation'])
+    var p = spawn(path.join(exports.config['condorLocation'], cmd), opts);//, {cwd: __dirname});
 
     //load event
     var stdout = "";
@@ -236,11 +247,11 @@ exports.hold = function(id, callback) {
 exports.q = function(id, callback) {
     //console.log("condor_q -long -xml "+id);
     var deferred = Q.defer();
-    
+
     var args=['-long', '-xml'];
     if(id)
         args.push(id);
-    
+
     condor_simple('condor_q', args).then(function(stdout, stderr) {
         //parse condor_q output
         XML.parse(stdout, function(err, attrs) {
@@ -254,12 +265,12 @@ exports.q = function(id, callback) {
                     else //no query was specified => there are no jobs
                         deferred.resolve([]);
                 } else {
-                
+
                     //if not array, wrap in array
                     var cs=Array.isArray(attrs.c)? attrs.c: [attrs.c];
-                
+
                     var jobs=cs.map(function(c) {
-                    
+
                         var events = {};
                         c.a.forEach(function(attr) {
                             var name = attr['@'].n;
@@ -276,7 +287,9 @@ exports.q = function(id, callback) {
                 }
             }
         });
-    }, deferred.reject);
+    }, function(error) {
+        deferred.reject(error);
+    });
     deferred.promise.nodeify(callback);
     return deferred.promise;
 };
@@ -304,7 +317,7 @@ exports.history = function(id, callback) {
                 attrs.c.a.forEach(function(attr) {
                     var name = attr['@'].n;
                     events[name] = parse_attrvalue(attr);
-                }); 
+                });
                 deferred.resolve(events);
             }
         });
@@ -347,4 +360,3 @@ exports.eventlog = {
         this.tail.unwatch();
     }
 }
-
