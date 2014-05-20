@@ -10,8 +10,17 @@ var temp = require('temp');
 var Q = require('q');
 var XML = require('xml-simple');
 
+var path = require('path');
+
 // Automatically track and cleanup files at exit
 temp.track();
+
+// Configuration for the module
+exports.config = {
+    condorLocation: null,
+    condorConfig: null
+}
+
 
 function parse_attrvalue(attr) {
     if(attr.s) {
@@ -44,7 +53,7 @@ exports.Joblog = function(path) {
         xml +="</c>";
         parse_jobxml(xml, function(event) {
             if(callbacks.length == 0) {
-                //I will never catch SubmitEvent, since the callback isn't registered until 
+                //I will never catch SubmitEvent, since the callback isn't registered until
                 //after submission completes... But they get the job object which contains
                 //pretty much the same info..
             }
@@ -65,7 +74,7 @@ exports.Joblog = function(path) {
                 attrs.a.forEach(function(attr) {
                     var name = attr['@'].n;
                     event[name] = parse_attrvalue(attr);
-                }); 
+                });
                 callback(event);
             }
         });
@@ -166,15 +175,15 @@ exports.submit = function(submit_options, config) {
                     var lines = stdout.split("\n");
                     var empty = lines.shift();//condor_q returns empty line at the top..
                     var header = lines.shift(); //** Proc 49714580.0:
-                    var header_tokens = header.split(" "); 
+                    var header_tokens = header.split(" ");
                     var jobid = header_tokens[2];
                     jobid = jobid.substring(0, jobid.length - 1); //remove last :
                     //jobid = jobid.split(".");
                     deferred.resolve({
                         //creating "job" object
                         id: jobid,
-                        props: adparser.parse(lines), 
-                        options: submit_options, 
+                        props: adparser.parse(lines),
+                        options: submit_options,
                         log: joblog
                     });
                 }
@@ -188,6 +197,17 @@ exports.submit = function(submit_options, config) {
 function condor_simple(cmd, opts) {
     var deferred = Q.defer();
 
+    // Export the condor config, if set
+    if (exports.config['condorConfig']) {
+        process.env['CONDOR_CONFIG'] = exports.config['condorConfig'];
+    }
+
+    // Update the PATH, if condorLocation is set
+    if (exports.config['condorLocation']) {
+        process.env['PATH'] = path.join(exports.config['condorLocation'], 'bin') + ':'
+                              + path.join(exports.config['condorLocation'], 'sbin') + ':'
+                              + process.env['PATH'];
+    }
     var p = spawn(cmd, opts);//, {cwd: __dirname});
 
     //load event
@@ -199,18 +219,12 @@ function condor_simple(cmd, opts) {
     p.stderr.on('data', function (data) {
         stderr += data;
     });
-    p.on('error', function (err) {
-        console.dir(err);
-        console.error(stderr);
-        console.log(stdout);
-        deferred.reject(err);
-    });
-    p.on('exit', function (code, signal) {
-        if(code !== 0) {
-            console.error(cmd+" failed with code:"+code);
-            console.error(stderr);
-            console.log(stdout);
-            deferred.reject(code, signal);
+    p.on('error', deferred.reject);
+    p.on('close', function (code, signal) {
+        if (signal) {
+            deferred.reject(cmd+ " was killed by signal "+ signal);
+        } else if (code !== 0) {
+            deferred.reject(cmd+ " failed with exit code "+ code+ "\nSTDERR:"+ stderr + "\nSTDOUT:"+ stdout);
         } else {
             deferred.resolve(stdout, stderr);
         }
@@ -242,31 +256,59 @@ exports.hold = function(id, callback) {
 exports.q = function(id, callback) {
     //console.log("condor_q -long -xml "+id);
     var deferred = Q.defer();
-    condor_simple('condor_q', [id, '-long', '-xml']).then(function(stdout, stderr) {
+
+    var args=['-long', '-xml'];
+    if(id)
+        args.push(id);
+
+    condor_simple('condor_q', args).then(function(stdout, stderr) {
         //parse condor_q output
         XML.parse(stdout, function(err, attrs) {
             if(err) {
-                console.error(err);
                 deferred.reject(err);
             } else if(attrs) {
-                //console.log("test.............................");
-                //console.dir(attrs);
-                if(!attrs.c) {
-                    deferred.reject("failed to load condor_q attrs");
-                    console.log(JSON.stringify(attrs, null, 2));
+
+                if (!attrs.c) {
+                    if (id) //the requested job was not found... error
+                        deferred.reject("Query for job "+id+" returned nothing");
+                    else //no query was specified => there are no jobs
+                        deferred.resolve([]);
                 } else {
-                    var events = {};
-                    attrs.c.a.forEach(function(attr) {
-                        var name = attr['@'].n;
-                        events[name] = parse_attrvalue(attr);
-                    }); 
-                    deferred.resolve(events);
+
+                    //if not array, wrap in array
+                    var cs=Array.isArray(attrs.c)? attrs.c: [attrs.c];
+
+                    var jobs=cs.map(function(c) {
+
+                        var events = {};
+                        c.a.forEach(function(attr) {
+                            var name = attr['@'].n;
+                            events[name] = parse_attrvalue(attr);
+                        });
+                        return events;
+                    });
+
+                    //return one single job if only one was requested
+                    if(id && jobs.length>0)
+                        deferred.resolve(jobs[0]);
+                    else //return an array of jobs otherwise
+                        deferred.resolve(jobs);
                 }
             }
         });
+    }, function(error) {
+        deferred.reject(error);
     });
     deferred.promise.nodeify(callback);
     return deferred.promise;
+};
+
+exports.drain = function(id, opts, callback) {
+
+    opts=opts||[];
+    opts.push(id);
+
+    return condor_simple('condor_drain', opts).nodeify(callback);
 };
 
 /* condor_history blocks!!!! WHY!
@@ -284,7 +326,7 @@ exports.history = function(id, callback) {
                 attrs.c.a.forEach(function(attr) {
                     var name = attr['@'].n;
                     events[name] = parse_attrvalue(attr);
-                }); 
+                });
                 deferred.resolve(events);
             }
         });
@@ -327,4 +369,3 @@ exports.eventlog = {
         this.tail.unwatch();
     }
 }
-
