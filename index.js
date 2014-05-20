@@ -197,18 +197,18 @@ exports.submit = function(submit_options, config) {
 function condor_simple(cmd, opts) {
     var deferred = Q.defer();
 
-    // Export the condor config, if set
-    if (exports.config['condorConfig']) {
-        process.env['CONDOR_CONFIG'] = exports.config['condorConfig'];
+    //add some extra env params
+    var env = extend({}, process.env);
+    if (exports.config.condorConfig) {
+        env.CONDOR_CONFIG = exports.config.condorConfig;
     }
-
-    // Update the PATH, if condorLocation is set
-    if (exports.config['condorLocation']) {
-        process.env['PATH'] = path.join(exports.config['condorLocation'], 'bin') + ':'
-                              + path.join(exports.config['condorLocation'], 'sbin') + ':'
-                              + process.env['PATH'];
+    if (exports.config.condorLocation) {
+        env.PATH = 
+                path.join(exports.config.condorLocation, 'bin') + ':' +
+                path.join(exports.config.condorLocation, 'sbin') + ':' +
+                env.PATH;
     }
-    var p = spawn(cmd, opts);//, {cwd: __dirname});
+    var p = spawn(cmd, opts, {env: env});//, {cwd: __dirname});
 
     //load event
     var stdout = "";
