@@ -125,6 +125,8 @@ htcondor.q()
 ]
 ```
 
+Aditionally, the `q()` function can take a specific job id, as a string.
+
 ## eventlog watcher
 
 This module allows you to subscribe to condor event log (usually at /var/log/condor/EventLog), and receive callbacks so that you can monitor job status or any other attribute changes.
