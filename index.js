@@ -58,7 +58,10 @@ exports.Joblog = function(path) {
                 //pretty much the same info..
             }
             callbacks.forEach(function(callback) {
-                callback(event);
+                //see http://howtonode.org/understanding-process-next-tick
+                process.nextTick(function() {
+                    callback(event);
+                });
             });
         });
     });
