@@ -17,8 +17,8 @@ temp.track();
 
 // Configuration for the module
 exports.config = {
-    condorLocation: "",
-    condorConfig: ""
+    condorLocation: null,
+    condorConfig: null
 }
 
 
@@ -197,9 +197,16 @@ exports.submit = function(submit_options, config) {
 function condor_simple(cmd, opts) {
     var deferred = Q.defer();
 
-    process.env['CONDOR_CONFIG'] = exports.config['condorConfig'];
-    console.log("condorLocation = " + exports.config['condorLocation'])
-    var p = spawn(path.join(exports.config['condorLocation'], cmd), opts);//, {cwd: __dirname});
+    if (exports.config['condorConfig']) {
+        process.env['CONDOR_CONFIG'] = exports.config['condorConfig'];
+    }
+
+    if (exports.config['condorLocation']) {
+        process.env['PATH'] = path.join(exports.config['condorLocation'], 'bin') + ':'
+                              + path.join(exports.config['condorLocation'], 'sbin') + ':'
+                              + process.env['PATH'];
+    }
+    var p = spawn(cmd, opts);//, {cwd: __dirname});
 
     //load event
     var stdout = "";
