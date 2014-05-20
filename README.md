@@ -102,6 +102,29 @@ htcondor.release(job).then(function() {
 
 ## Query Jobs
 
+You may also query the jobs.  
+
+```javascript
+htcondor = require("htcondor");
+htcondor.q()
+[
+    {
+        MaxHosts: 1,
+        Managed: 'Schedd',
+        User: 'user@blah.edu',
+        OnExitHold: false,
+        CoreSize: 0,
+        LastRemoteStatusUpdate: 1400098846,
+        LastHoldReason: 'Attempts to submit failed: Agent pid 58922\\\\n',
+        WantRemoteSyscalls: false,
+        MyType: 'Job',
+        Rank: 0,
+        ...
+    }
+    ...
+]
+```
+
 ## eventlog watcher
 
 This module allows you to subscribe to condor event log (usually at /var/log/condor/EventLog), and receive callbacks so that you can monitor job status or any other attribute changes.
@@ -160,6 +183,19 @@ Call unwatch() to stop watchin on eventlog
 ```javascript
 eventlog.unwatch()
 ```
+
+## Configuring the module
+
+You may optionally configure the module by setting `config` variable if HTCondor binaries or configuration are located in a non-standard location.  Current options are:
+
+<dl>
+  <dt>CondorLocation</dt>
+  <dd>The location of the HTCondor install.  The directory that contains htcondor's `bin`, `sbin`... directories.  This will be used when issuing commands by prepending the command with the full path.</dd>
+
+  <dt>CondorConfig</dt>
+  <dd>Location of the Condor configuration file.</dd>
+</dl>
+
 
 #License
 MIT. Please see License file for more details.
