@@ -100,6 +100,8 @@ htcondor.release(job).then(function() {
 });
 ```
 
+## Query Jobs
+
 ## eventlog watcher
 
 This module allows you to subscribe to condor event log (usually at /var/log/condor/EventLog), and receive callbacks so that you can monitor job status or any other attribute changes.
@@ -158,6 +160,6 @@ Call unwatch() to stop watchin on eventlog
 ```javascript
 eventlog.unwatch()
 ```
-            
+
 #License
 MIT. Please see License file for more details.
