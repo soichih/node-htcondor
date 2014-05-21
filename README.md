@@ -125,7 +125,7 @@ htcondor.q()
 ]
 ```
 
-
+Aditionally, the `q()` function can take a specific job id, as a string.
 
 ## eventlog watcher
 
@@ -197,6 +197,7 @@ You may optionally configure the module by setting `config` variable if HTCondor
   <dt>CondorConfig</dt>
   <dd>Location of the Condor configuration file.</dd>
 </dl>
+
 
 #License
 MIT. Please see License file for more details.
