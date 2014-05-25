@@ -1,8 +1,11 @@
 
 htcondor = require("../index.js");
+path = require("path");
 
-//htcondor.config['condorLocation'] = "/Users/derekweitzel/bosco"
-//htcondor.config['condorConfig'] = "/Users/derekweitzel/bosco/etc/condor_config"
+
+homeDir = process.env.HOME;
+htcondor.config.condorLocation = path.join(homeDir, "bosco");
+htcondor.config.condorConfig = path.join(homeDir, "bosco/etc/condor_config");
 
 htcondor.q().then(function(jobs) {
   console.log("Got jobs");

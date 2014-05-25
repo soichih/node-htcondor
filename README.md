@@ -224,5 +224,6 @@ You may optionally configure the module by setting `config` variable if HTCondor
   <dd>Location of the Condor configuration file.</dd>
 </dl>
 
+
 #License
 MIT. Please see License file for more details.
