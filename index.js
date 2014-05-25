@@ -196,10 +196,7 @@ exports.submit = function(submit_options, config) {
     return deferred.promise;
 };
 
-//run simple condor command that takes job id as an argument
-function condor_simple(cmd, opts) {
-    var deferred = Q.defer();
-
+function get_condor_env() {
     //add some extra env params
     var env = extend({}, process.env);
     if (exports.config.condorConfig) {
@@ -211,7 +208,13 @@ function condor_simple(cmd, opts) {
                 path.join(exports.config.condorLocation, 'sbin') + ':' +
                 env.PATH;
     }
-    var p = spawn(cmd, opts, {env: env});//, {cwd: __dirname});
+    return env;
+}
+
+//run simple condor command that takes job id as an argument
+function condor_simple(cmd, opts) {
+    var deferred = Q.defer();
+    var p = spawn(cmd, opts, {env: get_condor_env()});//, {cwd: __dirname});
 
     //load event
     var stdout = "";
@@ -239,16 +242,6 @@ exports.remove = function(opts, callback) {
     //console.log("calling condor_rm");
     //console.dir(opts);
     return condor_simple('condor_rm', opts).nodeify(callback);
-    /*
-    if(typeof id === 'array') {
-        console.log("array given. passing everything");
-        console.dir(id);
-        return condor_simple('condor_rm', id).nodeify(callback);
-    } else {
-        //must be a single id
-        return condor_simple('condor_rm', [id]).nodeify(callback);
-    }
-    */
 };
 exports.release = function(id, callback) {
     return condor_simple('condor_release', [id]).nodeify(callback);
@@ -256,33 +249,186 @@ exports.release = function(id, callback) {
 exports.hold = function(id, callback) {
     return condor_simple('condor_hold', [id]).nodeify(callback);
 };
-exports.q = function(id, callback) {
-    //console.log("condor_q -long -xml "+id);
+
+//you can receive callbacks for each item, or use .then() to recieve list of all items
+function condor_classads_stream(cmd, opts, item) {
+    var deferred = Q.defer();
+    var p = spawn(cmd, opts, {env: get_condor_env()});//, {cwd: __dirname});
+    var buffer = "";
+    var items = [];
+    function getblock() {
+        //look for start / end delimiter
+        var s = buffer.indexOf("\n<c>\n");
+        var e = buffer.indexOf("\n</c>\n");
+        if(s != -1 && e != -1) {
+            //var block = buffer.splice(spos, epos);
+            xml = buffer.substring(s, e+5);
+            buffer = buffer.substring(e+5);
+            XML.parse(xml, function(err, attrs) {
+                //console.dir(xml);
+                if(err) {
+                    console.log("failed to parse job xml (skipping)");
+                    console.error(err);
+                    console.log(xml);
+                } else {
+                    var event = {};
+                    if(!attrs.a) {
+                        event._no_attributes = true;
+                    } else {
+                        if(!attrs.a.forEach) {
+                            attrs.a = [attrs.a];
+                        }
+                        attrs.a.forEach(function(attr) {
+                            var name = attr['@'].n;
+                            event[name] = parse_attrvalue(attr);
+                        });
+                    }
+                    if(item) {
+                        item(null, event);
+                    }
+                    items.push(event);
+                }
+            });
+            return true;
+        } else {
+            return false;
+        }
+    }
+    p.stdout.on('data', function (data) {
+        buffer += data.toString();
+        while(getblock());
+    });
+
+    var stderr = "";
+    p.stderr.on('data', function (data) {
+        stderr += data;
+    });
+    p.on('error', function(err) {
+        console.error(err);
+        deferred.reject(err);
+        item(err);
+    });
+    p.on('close', function (code, signal) {
+        while(getblock());
+        if (signal) {
+            deferred.reject(cmd+ " was killed by signal "+ signal);
+            if(item) {
+                item({code: code, signal: signal, stdout: buffer, stderr: stderr});
+            }
+        } else if (code !== 0) {
+            deferred.reject(cmd+ " failed with exit code "+ code+ "\nSTDERR:"+ stderr + "\nSTDOUT:"+ stdout);
+            if(item) {
+                item({code: code, signal: signal, stdout: buffer, stderr: stderr});
+            }
+        } else {
+            deferred.resolve(items);
+        }
+    });
+    return deferred.promise;
+}
+
+exports.q = function(config, item) {
+    var args = ['-xml'];
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    //general opts
+    if(config.global) { //queue all schedulers in this pool
+        args.push("-global");
+    }
+    if(config.submitter) { //get queue of specified submitter
+        args.push("-submitter");
+        args.push(config.submitter);
+    }
+    if(config.name) { //name of scheduler
+        args.push("-name");
+        args.push(config.name);
+    }
+    if(config.pool) { //use host as the central manager to query
+        args.push("-pool");
+        args.push(config.pool);
+    }
+    if(config.jobads) { //Read queue from a file of job ClassAds
+        args.push("-jobads");
+        args.push(config.jobads);
+    }
+    if(config.userlog) { //Read queue from a user log file
+        args.push("-userlog");
+        args.push(config.jobads);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    //restriction-list
+    if(config.id) { //job id (cluxster.proc)
+        args.push(config.id);
+    }
+    if(config.owner) { //job id (cluxster.proc)
+        args.push(config.owner);
+    }
+    if(config.constraint) { //Get information about jobs that match <expr>
+        args.push("-constraint");
+        args.push(config.constraint);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    //output-opts
+    if(config.attributes) {
+        args.push("-attributes");
+        args.push(config.attributes.join(","));
+    }
+
+    //console.dir(args);
+    //process.exit(1);
+
+    return condor_classads_stream('condor_q', args, item);
+    //condor_classads_stream('cat',['/home/hayashis/git/node-htcondor/test/test.xml'], item, done);
+};
+
+/*
+exports.q = function(config, callback) {
     var deferred = Q.defer();
 
     var args=['-long', '-xml'];
-    if(id)
+    var id = null;
+    if(typeof config === 'function') {
+        //user probably provided no config, but provided a callback
+        callback = config;
+    } else if(typeof config === 'object') {
+        //config object provided as first argument
+        if(config.attributes) {
+            args.push("-attributes");
+            args.push(config.attributes.join(","));
+        }
+    } else {
+        //must be the job id (or user id?)
+        id = config;
         args.push(id);
+    }
 
+    //TODO..
+    //condor_q could be quite large, and parsing the whole thing isn't a good idea
+    //condor_simple probably won't cut it..
     condor_simple('condor_q', args).then(function(stdout, stderr) {
-        //parse condor_q output
         XML.parse(stdout, function(err, attrs) {
             if(err) {
+                //console.log("failed to parse XML");
+                //console.dir(err);
                 deferred.reject(err);
             } else if(attrs) {
-
+                //console.log("got attrs");
+                //console.dir(attrs);
+                console.log("parsed condor_q outupt");
                 if (!attrs.c) {
-                    if (id) //the requested job was not found... error
+                    if (id) {
+                        //the requested job was not found... error
                         deferred.reject("Query for job "+id+" returned nothing");
-                    else //no query was specified => there are no jobs
+                    } else { 
+                        //no query was specified => there are no jobs
                         deferred.resolve([]);
+                    }
                 } else {
-
                     //if not array, wrap in array
                     var cs=Array.isArray(attrs.c)? attrs.c: [attrs.c];
-
                     var jobs=cs.map(function(c) {
-
                         var events = {};
                         c.a.forEach(function(attr) {
                             var name = attr['@'].n;
@@ -297,6 +443,8 @@ exports.q = function(id, callback) {
                     else //return an array of jobs otherwise
                         deferred.resolve(jobs);
                 }
+            } else {
+                console.log("no err, no attrs... now what?");
             }
         });
     }, function(error) {
@@ -305,6 +453,7 @@ exports.q = function(id, callback) {
     deferred.promise.nodeify(callback);
     return deferred.promise;
 };
+*/
 
 exports.drain = function(id, opts, callback) {
 

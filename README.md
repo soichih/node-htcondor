@@ -102,30 +102,56 @@ htcondor.release(job).then(function() {
 
 ## Query Jobs
 
-You may also query the jobs.  
+Wrapper for condor_q
 
 ```javascript
 htcondor = require("htcondor");
-htcondor.q()
-[
-    {
-        MaxHosts: 1,
-        Managed: 'Schedd',
-        User: 'user@blah.edu',
-        OnExitHold: false,
-        CoreSize: 0,
-        LastRemoteStatusUpdate: 1400098846,
-        LastHoldReason: 'Attempts to submit failed: Agent pid 58922\\\\n',
-        WantRemoteSyscalls: false,
-        MyType: 'Job',
-        Rank: 0,
-        ...
-    }
-    ...
-]
+htcondor.q({id: "59794891.0"},
+function(err, job) {
+    //this will be called as many times as there are jobs under user:donkri
+    console.log(JSON.stringify(item, null, 4));
+});
 ```
 
+Outputs job entry..
 
+```
+{
+    "MATCH_EXP_JOB_GLIDEIN_Entry_Name": "CMS_T2_US_Caltech_cit",
+    "MaxHosts": 1,
+    "MemoryUsage": "expression:( ( ResidentSetSize + 1023 ) / 1024 )",
+    "MATCH_EXP_JOBGLIDEIN_ResourceName": "CIT_CMS_T2",
+    "MATCH_EXP_JOB_GLIDECLIENT_Name": "osg-flock-grid-iu-edu_OSG_gWMSFrontend.main",
+    "AccountingGroup": "group_xsedehigh.psiders",
+    "User": "psiders@osg-xsede.grid.iu.edu",
+    "NumJobReconnects": 1,
+    "OnExitHold": "expression:( ExitBySignal == true ) || ( ExitCode isnt 0 )",
+    "MATCH_GLIDEIN_ClusterId": 1998341,
+    "CoreSize": 0,
+...
+}
+
+```
+
+You can set various condor_q options.. like constraint. If you are expecting a lot of job entries to be returned, 
+you should almost always want to specify your attributes with condor_q... or it will be very inefficient.
+
+```javascript
+htcondor.q({constraint: "JobStatus==5", attributes: ["Iwd", "Owner", "JobStatus"]}, function(err, job) {
+    if(err) {
+        console.error(err);
+    }
+    console.log(JSON.stringify(item, null, 4));
+});
+```
+
+You can also use then() to receive all job entries in a single array.
+
+```
+htcondor.q({constraint: "JobStatus==5"}).then(function(jobs) {
+    console.log(JSON.stringify(items, null, 4));
+});
+```
 
 ## eventlog watcher
 
