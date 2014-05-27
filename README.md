@@ -149,7 +149,7 @@ You can also use then() to receive all job entries in a single array.
 
 ```
 htcondor.q({constraint: "JobStatus==5"}).then(function(jobs) {
-    console.log(JSON.stringify(items, null, 4));
+    console.log(JSON.stringify(jobs, null, 4));
 });
 ```
 

@@ -316,7 +316,7 @@ function condor_classads_stream(cmd, opts, item) {
                 item({code: code, signal: signal, stdout: buffer, stderr: stderr});
             }
         } else if (code !== 0) {
-            deferred.reject(cmd+ " failed with exit code "+ code+ "\nSTDERR:"+ stderr + "\nSTDOUT:"+ stdout);
+            deferred.reject(cmd+ " failed with exit code "+ code+ "\nSTDERR:"+ stderr + "\nbuffer:"+ buffer);
             if(item) {
                 item({code: code, signal: signal, stdout: buffer, stderr: stderr});
             }

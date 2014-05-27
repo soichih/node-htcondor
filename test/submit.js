@@ -21,6 +21,11 @@ htcondor.submit(submit_options).then(function(job) {
     console.log("Submitted");
     console.dir(job);
 
+    htcondor.q(job, function(err, j) {
+        console.log("condor_q info");
+        console.dir(j);
+    });
+
     job.log.onevent(function(event) {
         //console.dir(event);
         switch(event.MyType) {
