@@ -8,7 +8,8 @@ var adparser = require('./lib').adparser;
 
 var temp = require('temp');
 var Q = require('q');
-var XML = require('xml-simple');
+//var XML = require('xml-simple');
+var xml2js = require('xml2js');
 
 var path = require('path');
 
@@ -66,16 +67,18 @@ exports.Joblog = function(path) {
         });
     });
 
+    var parser = new xml2js.Parser();
     function parse_jobxml(xml, callback) {
-        XML.parse(xml, function(err, attrs) {
+        //XML.parse(xml, function(err, attrs) {
+        parser.parseString(xml, function(err, attrs) {
             if(err) {
                 console.log("failed to parse job xml (skipping)");
                 console.error(err);
                 console.log(xml);
             } else {
                 var event = {};
-                attrs.a.forEach(function(attr) {
-                    var name = attr['@'].n;
+                attrs.c.a.forEach(function(attr) {
+                    var name = attr.$.n;
                     event[name] = parse_attrvalue(attr);
                 });
                 callback(event);
@@ -256,6 +259,8 @@ function condor_classads_stream(cmd, opts, item) {
     var p = spawn(cmd, opts, {env: get_condor_env()});//, {cwd: __dirname});
     var buffer = "";
     var items = [];
+    
+    var parser = new xml2js.Parser();
     function getblock() {
         //look for start / end delimiter
         var s = buffer.indexOf("\n<c>\n");
@@ -264,7 +269,8 @@ function condor_classads_stream(cmd, opts, item) {
             //var block = buffer.splice(spos, epos);
             xml = buffer.substring(s, e+5);
             buffer = buffer.substring(e+5);
-            XML.parse(xml, function(err, attrs) {
+            //XML.parse(xml, function(err, attrs) {
+            parser.parseString(xml, function(err, attrs) {
                 //console.dir(xml);
                 if(err) {
                     console.log("failed to parse job xml (skipping)");
@@ -272,14 +278,14 @@ function condor_classads_stream(cmd, opts, item) {
                     console.log(xml);
                 } else {
                     var event = {};
-                    if(!attrs.a) {
+                    if(!attrs.c) {
                         event._no_attributes = true;
                     } else {
-                        if(!attrs.a.forEach) {
-                            attrs.a = [attrs.a];
+                        if(!attrs.c.a.forEach) {
+                            attrs.c.a = [attrs.c.a];
                         }
-                        attrs.a.forEach(function(attr) {
-                            var name = attr['@'].n;
+                        attrs.c.a.forEach(function(attr) {
+                            var name = attr.$.n;
                             event[name] = parse_attrvalue(attr);
                         });
                     }
