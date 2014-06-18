@@ -520,4 +520,15 @@ exports.eventlog = {
     unwatch: function() {
         this.tail.unwatch();
     }
-}
+};
+
+//http://pages.cs.wisc.edu/~adesmet/status.html
+exports.status_ids = {
+    0: {label: "Unexpanded", code: "U"},
+    1: {label: "Idle", code: "I"},
+    2: {label: "Running", code: "R"},
+    3: {label: "Removed", code: "X"},
+    4: {label: "Completed", code: "C"},
+    5: {label: "Held", code: "H"},
+    6: {label: "Submission Error", code: "E"},
+};

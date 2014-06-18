@@ -24,21 +24,35 @@ exports.adparser = {
     parse: function(lines) {
         //parse class ad key/value
         var props = {};
+        var cont = null;
+        var cont_key = null;
         lines.forEach(function(line) {
             if(line == "") return;
-            var dpos = line.indexOf(" = ");
-            if(dpos == -1) {
-                console.log("malformed value.. ignoring");
-                console.log(line);
-                //This occurs when a string contains newline like following sample
-                //CurrentTime = time()
-                //ReceivedBytes = 9647680.000000
-                //Message = "Error from glidein_3592@hansen-a005.rcac.purdue.edu: dprintf hit fatal errors
-                //"
+            if(cont) {
+                if(line.indexOf('"') == -1) {
+                    //continue on..
+                    cont = cont+"\n"+line;
+                } else {
+                    //ended
+                    props[cont_key] = exports.adparser.parse_value(cont);
+                    console.log("parsed multline value:"+cont);
+                    cont = null;
+                }
             } else {
-                var key = line.substring(0, dpos);
-                var value = line.substring(dpos+3);
-                props[key] = exports.adparser.parse_value(value);
+                var dpos = line.indexOf(" = ");
+                if(dpos == -1) {
+                    console.log("malformed value.. ignoring");
+                    console.log(lines);
+                } else {
+                    var key = line.substring(0, dpos);
+                    var value = line.substring(dpos+3);
+                    if(value[0] == '"' && value.indexOf('"', 1) == -1) {
+                        //found quoted string not delimited by " - probably continuing to the next line 
+                        cont = value.substring(0, value.length);
+                    } else {
+                        props[key] = exports.adparser.parse_value(value);
+                    }
+                }
             }
         });
         return props;
