@@ -106,10 +106,8 @@ Wrapper for condor_q
 
 ```javascript
 htcondor = require("htcondor");
-htcondor.q({id: "59794891.0"},
-function(err, job) {
-    //this will be called as many times as there are jobs under user:donkri
-    console.log(JSON.stringify(item, null, 4));
+htcondor.q({id: "59794891.0"},function(err, job) {
+    console.log(JSON.stringify(job, null, 4));
 });
 ```
 
@@ -137,6 +135,7 @@ You can set various condor_q options.. like constraint. If you are expecting a l
 you should almost always want to specify your attributes with condor_q... or it will be very inefficient.
 
 ```javascript
+htcondor = require("htcondor");
 htcondor.q({constraint: "JobStatus==5", attributes: ["Iwd", "Owner", "JobStatus"]}, function(err, job) {
     if(err) {
         console.error(err);
@@ -148,6 +147,7 @@ htcondor.q({constraint: "JobStatus==5", attributes: ["Iwd", "Owner", "JobStatus"
 You can also use then() to receive all job entries in a single array.
 
 ```
+htcondor = require("htcondor");
 htcondor.q({constraint: "JobStatus==5"}).then(function(jobs) {
     console.log(JSON.stringify(jobs, null, 4));
 });
@@ -210,6 +210,21 @@ Call unwatch() to stop watchin on eventlog
 
 ```javascript
 eventlog.unwatch()
+```
+
+## dump condor config
+
+(This is a prototype feature)
+
+You can dump all condor configs (in key/value dictionary).
+
+```javascript
+htcondor.dumpconfig().then(function(configs) {
+    console.dir(configs);
+}).catch(function(err) {
+    console.log("error occured");
+    console.dir(err);
+});
 ```
 
 ## Configuring the module
