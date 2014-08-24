@@ -243,42 +243,47 @@ exports.remove = function(config, callback) {
     //console.dir(opts);
     var args = ['-totals'];
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    //general opts
-    if(config.name) { //name of scheduler
-        args.push("-name");
-        args.push(config.name);
-    }
-    if(config.pool) { //Use the given central manager to find daemons
-        args.push("-pool");
-        args.push(config.pool);
-    }
-    if(config.addr) { //Connect directly to the given "sinful string"
-        args.push("-addr");
-        args.push(config.addr);
-    }
-    if(config.reason) { //Use the given RemoveReason
-        args.push("-reason");
-        args.push(config.reason);
-    }
-    if(config.forces) { //Force the immediate local removal of jobs in the X state
-        args.push("-forcex");
-    }
+    if(typeof config === 'object') {
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    //restriction-list
-    if(config.id) { //job id (cluxster.proc)
-        args.push(config.id);
-    }
-    if(config.owner) { //Remove all jobs owned by user
-        args.push(config.owner);
-    }
-    if(config.constraint) { //Remove all jobs matching the boolean expression
-        args.push("-constraint");
-        args.push(config.constraint);
-    }
-    if(config.all) { //Remove all jobs (cannot be used with other constraints)
-        args.push("-all");
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //general opts
+        if(config.name) { //name of scheduler
+            args.push("-name");
+            args.push(config.name);
+        }
+        if(config.pool) { //Use the given central manager to find daemons
+            args.push("-pool");
+            args.push(config.pool);
+        }
+        if(config.addr) { //Connect directly to the given "sinful string"
+            args.push("-addr");
+            args.push(config.addr);
+        }
+        if(config.reason) { //Use the given RemoveReason
+            args.push("-reason");
+            args.push(config.reason);
+        }
+        if(config.forces) { //Force the immediate local removal of jobs in the X state
+            args.push("-forcex");
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //restriction-list
+        if(config.id) { //job id (cluxster.proc)
+            args.push(config.id);
+        }
+        if(config.owner) { //Remove all jobs owned by user
+            args.push(config.owner);
+        }
+        if(config.constraint) { //Remove all jobs matching the boolean expression
+            args.push("-constraint");
+            args.push(config.constraint);
+        }
+        if(config.all) { //Remove all jobs (cannot be used with other constraints)
+            args.push("-all");
+        }
+    } else {
+        args.push(config); //must be a jobid, or user name
     }
 
     return condor_simple('condor_rm', args).nodeify(callback);
@@ -373,50 +378,55 @@ function condor_classads_stream(cmd, opts, item) {
 exports.q = function(config, item) {
     var args = ['-xml'];
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    //general opts
-    if(config.global) { //queue all schedulers in this pool
-        args.push("-global");
-    }
-    if(config.submitter) { //get queue of specified submitter
-        args.push("-submitter");
-        args.push(config.submitter);
-    }
-    if(config.name) { //name of scheduler
-        args.push("-name");
-        args.push(config.name);
-    }
-    if(config.pool) { //use host as the central manager to query
-        args.push("-pool");
-        args.push(config.pool);
-    }
-    if(config.jobads) { //Read queue from a file of job ClassAds
-        args.push("-jobads");
-        args.push(config.jobads);
-    }
-    if(config.userlog) { //Read queue from a user log file
-        args.push("-userlog");
-        args.push(config.jobads);
-    }
+    if(typeof config === 'object') {
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    //restriction-list
-    if(config.id) { //job id (cluxster.proc)
-        args.push(config.id);
-    }
-    if(config.owner) { //job id (cluxster.proc)
-        args.push(config.owner);
-    }
-    if(config.constraint) { //Get information about jobs that match <expr>
-        args.push("-constraint");
-        args.push(config.constraint);
-    }
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //general opts
+        if(config.global) { //queue all schedulers in this pool
+            args.push("-global");
+        }
+        if(config.submitter) { //get queue of specified submitter
+            args.push("-submitter");
+            args.push(config.submitter);
+        }
+        if(config.name) { //name of scheduler
+            args.push("-name");
+            args.push(config.name);
+        }
+        if(config.pool) { //use host as the central manager to query
+            args.push("-pool");
+            args.push(config.pool);
+        }
+        if(config.jobads) { //Read queue from a file of job ClassAds
+            args.push("-jobads");
+            args.push(config.jobads);
+        }
+        if(config.userlog) { //Read queue from a user log file
+            args.push("-userlog");
+            args.push(config.jobads);
+        }
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    //output-opts
-    if(config.attributes) {
-        args.push("-attributes");
-        args.push(config.attributes.join(","));
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //restriction-list
+        if(config.id) { //job id (cluxster.proc)
+            args.push(config.id);
+        }
+        if(config.owner) { //job id (cluxster.proc)
+            args.push(config.owner);
+        }
+        if(config.constraint) { //Get information about jobs that match <expr>
+            args.push("-constraint");
+            args.push(config.constraint);
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //output-opts
+        if(config.attributes) {
+            args.push("-attributes");
+            args.push(config.attributes.join(","));
+        }
+    } else {
+        args.push(config); //must be a jobid
     }
 
     return condor_classads_stream('condor_q', args, item);
