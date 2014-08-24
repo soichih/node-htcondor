@@ -462,11 +462,39 @@ exports.q = function(config, callback) {
 */
 
 exports.drain = function(id, opts, callback) {
-
     opts=opts||[];
     opts.push(id);
-
     return condor_simple('condor_drain', opts).nodeify(callback);
+};
+
+exports.dumpconfig = function(callback) {
+    var deferred = Q.defer();
+    condor_simple('condor_config_val', ['-dump', '-expand']).then(function(out) {
+        var outs = out.split("\n");
+        var configs = {};
+        outs.forEach(function(config) {
+                if(config[0] == "#") return;
+                if(config == "") return;
+                var tokens = config.split(" = "); 
+                //console.log(tokens[0] + " ... " + tokens[1]); 
+                var key = tokens[0];
+                var value = tokens[1];
+                switch(value.toLowerCase()) {
+                case "(null)":
+                    value = null; break;
+                case "false":
+                    value = false; break;
+                case "true":
+                    value = true; break;
+                }
+                configs[key] = value;
+        });
+        deferred.resolve(configs);
+    }).catch(function(err) {
+        deferred.reject(err);
+    });
+    deferred.promise.nodeify(callback);
+    return deferred.promise;
 };
 
 /* condor_history blocks!!!! WHY!
@@ -528,7 +556,8 @@ exports.eventlog = {
     }
 };
 
-//http://pages.cs.wisc.edu/~adesmet/status.html
+//for various condor related codes
+//https://htcondor-wiki.cs.wisc.edu/index.cgi/wiki?p=MagicNumbers
 exports.status_ids = {
     0: {label: "Unexpanded", code: "U"},
     1: {label: "Idle", code: "I"},

@@ -212,6 +212,21 @@ Call unwatch() to stop watchin on eventlog
 eventlog.unwatch()
 ```
 
+## dump condor config
+
+(This is a prototype feature)
+
+You can dump all condor configs (in key/value dictionary).
+
+```javascript
+htcondor.dumpconfig().then(function(configs) {
+    console.dir(configs);
+}).catch(function(err) {
+    console.log("error occured");
+    console.dir(err);
+});
+```
+
 ## Configuring the module
 
 You may optionally configure the module by setting `config` variable if HTCondor binaries or configuration are located in a non-standard location.  Current options are:
