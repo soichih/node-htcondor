@@ -3,8 +3,7 @@ var spawn = require('child_process').spawn;
 var extend = require('util')._extend;
 
 var Tail = require('tail').Tail;
-var lib = require('./lib');
-var adparser = require('./lib').adparser;
+var adparser = require('./adparser').adparser;
 
 var temp = require('temp');
 var Q = require('q');
@@ -239,10 +238,50 @@ function condor_simple(cmd, opts) {
     return deferred.promise;
 }
 
-exports.remove = function(opts, callback) {
+exports.remove = function(config, callback) {
     //console.log("calling condor_rm");
     //console.dir(opts);
-    return condor_simple('condor_rm', opts).nodeify(callback);
+    var args = ['-totals'];
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    //general opts
+    if(config.name) { //name of scheduler
+        args.push("-name");
+        args.push(config.name);
+    }
+    if(config.pool) { //Use the given central manager to find daemons
+        args.push("-pool");
+        args.push(config.pool);
+    }
+    if(config.addr) { //Connect directly to the given "sinful string"
+        args.push("-addr");
+        args.push(config.addr);
+    }
+    if(config.reason) { //Use the given RemoveReason
+        args.push("-reason");
+        args.push(config.reason);
+    }
+    if(config.forces) { //Force the immediate local removal of jobs in the X state
+        args.push("-forcex");
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    //restriction-list
+    if(config.id) { //job id (cluxster.proc)
+        args.push(config.id);
+    }
+    if(config.owner) { //Remove all jobs owned by user
+        args.push(config.owner);
+    }
+    if(config.constraint) { //Remove all jobs matching the boolean expression
+        args.push("-constraint");
+        args.push(config.constraint);
+    }
+    if(config.all) { //Remove all jobs (cannot be used with other constraints)
+        args.push("-all");
+    }
+
+    return condor_simple('condor_rm', args).nodeify(callback);
 };
 exports.release = function(id, callback) {
     return condor_simple('condor_release', [id]).nodeify(callback);

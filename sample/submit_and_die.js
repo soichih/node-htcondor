@@ -17,8 +17,15 @@ var submit_options = {
 
 //for list of event.EventTypeNumber http://pages.cs.wisc.edu/~adesmet/status.html
 htcondor.submit(submit_options).then(function(job) {
-    console.log("Submitted.. not removing job");
-    htcondor.remove(job);
+    console.log("Submitted.. now removing job");
+    htcondor.remove(job).then(function(ret) {
+        console.dir(ret);
+        console.dir("done now.. unwatching job");
+        job.log.unwatch();
+    }).catch(function(err) {
+        console.log("remove failed");
+        console.dir(err);
+    });
 }).catch(function(err) {
     console.log("submission rejected:"+err);
 }).done();

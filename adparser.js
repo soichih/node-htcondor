@@ -28,6 +28,7 @@ exports.adparser = {
         var cont_key = null;
         lines.forEach(function(line) {
             if(line == "") return;
+            if(line == ".") return; //what is this?
             if(cont) {
                 if(line.indexOf('"') == -1) {
                     //continue on..
@@ -41,8 +42,8 @@ exports.adparser = {
             } else {
                 var dpos = line.indexOf(" = ");
                 if(dpos == -1) {
-                    console.log("malformed value.. ignoring");
-                    console.log(lines);
+                    console.log("malformed classad .. ignoring");
+                    console.log(line);
                 } else {
                     var key = line.substring(0, dpos);
                     var value = line.substring(dpos+3);
