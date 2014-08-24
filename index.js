@@ -22,7 +22,6 @@ exports.config = {
     condorConfig: null
 }
 
-
 function parse_attrvalue(attr) {
     if(attr.s) {
         return attr.s;
@@ -88,7 +87,6 @@ exports.Joblog = function(path) {
 };
 exports.Joblog.prototype = {
     onevent: function(call) {
-        //console.log("registering on event");
         this.callbacks.push(call);
     },
     unwatch: function() {
@@ -382,84 +380,8 @@ exports.q = function(config, item) {
         args.push(config.attributes.join(","));
     }
 
-    //console.dir(args);
-    //process.exit(1);
-
     return condor_classads_stream('condor_q', args, item);
-    //condor_classads_stream('cat',['/home/hayashis/git/node-htcondor/test/test.xml'], item, done);
 };
-
-/*
-exports.q = function(config, callback) {
-    var deferred = Q.defer();
-
-    var args=['-long', '-xml'];
-    var id = null;
-    if(typeof config === 'function') {
-        //user probably provided no config, but provided a callback
-        callback = config;
-    } else if(typeof config === 'object') {
-        //config object provided as first argument
-        if(config.attributes) {
-            args.push("-attributes");
-            args.push(config.attributes.join(","));
-        }
-    } else {
-        //must be the job id (or user id?)
-        id = config;
-        args.push(id);
-    }
-
-    //TODO..
-    //condor_q could be quite large, and parsing the whole thing isn't a good idea
-    //condor_simple probably won't cut it..
-    condor_simple('condor_q', args).then(function(stdout, stderr) {
-        XML.parse(stdout, function(err, attrs) {
-            if(err) {
-                //console.log("failed to parse XML");
-                //console.dir(err);
-                deferred.reject(err);
-            } else if(attrs) {
-                //console.log("got attrs");
-                //console.dir(attrs);
-                console.log("parsed condor_q outupt");
-                if (!attrs.c) {
-                    if (id) {
-                        //the requested job was not found... error
-                        deferred.reject("Query for job "+id+" returned nothing");
-                    } else { 
-                        //no query was specified => there are no jobs
-                        deferred.resolve([]);
-                    }
-                } else {
-                    //if not array, wrap in array
-                    var cs=Array.isArray(attrs.c)? attrs.c: [attrs.c];
-                    var jobs=cs.map(function(c) {
-                        var events = {};
-                        c.a.forEach(function(attr) {
-                            var name = attr['@'].n;
-                            events[name] = parse_attrvalue(attr);
-                        });
-                        return events;
-                    });
-
-                    //return one single job if only one was requested
-                    if(id && jobs.length>0)
-                        deferred.resolve(jobs[0]);
-                    else //return an array of jobs otherwise
-                        deferred.resolve(jobs);
-                }
-            } else {
-                console.log("no err, no attrs... now what?");
-            }
-        });
-    }, function(error) {
-        deferred.reject(error);
-    });
-    deferred.promise.nodeify(callback);
-    return deferred.promise;
-};
-*/
 
 exports.drain = function(id, opts, callback) {
     opts=opts||[];
