@@ -154,6 +154,7 @@ exports.submit = function(submit_options, config) {
             }
 
             //submit!
+            //console.log("spawning: condor_submit "+submit.path);
             condor_submit = spawn('condor_submit', ['-verbose', submit.path]);//, {cwd: __dirname});
 
             //load event
@@ -167,6 +168,7 @@ exports.submit = function(submit_options, config) {
             });
             //should I use exit instead of close?
             condor_submit.on('close', function (code, signal) {
+                //console.log("spawning (closed): condor_submit "+submit.path+ " code:"+code+" signal:"+signal);
                 if(code !== 0) {
                     console.error("submit failed with code:"+code);
                     console.error(stdout);

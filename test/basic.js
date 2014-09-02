@@ -25,6 +25,14 @@ describe('submit', function() {
             done(err);
         });
     });
+    it('should query job', function(done) {
+        htcondor.q(job).then(function(ret) {
+            console.log(ret);
+            done();
+        }).catch(function(err) {
+            done(err);
+        });
+    });
     it('should remove the job submitted earlier', function(done) {
         htcondor.remove(job).then(function(ret) {
             console.log(ret);
@@ -42,6 +50,14 @@ describe('submit', function() {
             queue: 1
         }).then(function(_job) {
             job = _job;
+            done();
+        }).catch(function(err) {
+            done(err);
+        });
+    });
+    it('should query job with job.id as an argument', function(done) {
+        htcondor.q(job.id).then(function(ret) {
+            console.log(ret);
             done();
         }).catch(function(err) {
             done(err);
