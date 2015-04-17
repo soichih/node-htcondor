@@ -40,7 +40,7 @@ htcondor.submit(submit_options).then(function(job) {
     //console.dir(job.id);
 
     //you can *watch* job log
-    job.log.watch(function(event) {
+    job.log.onevent(function(event) {
         switch(event.MyType) {
 
         //normal status type events (just display content)
