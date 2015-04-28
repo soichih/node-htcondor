@@ -241,5 +241,11 @@ You may optionally configure the module by setting `config` variable if HTCondor
 </dl>
 
 
+## Warning
+
+node-htcondor basically watched job log for all jobs that you submit (using Tail which uses inotify kernel hook). Don't submit
+too many jobs at once (instead, throttle it - around 1000 - 2000 jobs each). You can see your current limit imposed by your OS by
+looking at /proc/sys/fs/inotify/max_user_watche
+
 #License
 MIT. Please see License file for more details.
