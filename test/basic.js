@@ -1,4 +1,8 @@
 var htcondor = require('../index');
+var chai = require('chai');
+
+var should = chai.should;
+var expect = chai.expect;
 
 describe('submit', function() {
     var job;
@@ -26,8 +30,9 @@ describe('submit', function() {
         });
     });
     it('should query job', function(done) {
-        htcondor.q(job).then(function(ret) {
-            console.log(ret);
+        htcondor.q(job).then(function(jobs) {
+            expect(jobs.length).to.equal(1);
+            console.log(jobs);
             done();
         }).catch(function(err) {
             done(err);

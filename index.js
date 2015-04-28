@@ -322,9 +322,15 @@ function condor_classads_stream(cmd, opts, item) {
                     console.log(xml);
                 } else {
                     var event = {};
-                    if(!attrs.c) {
+                    if(!attrs.c || !attrs.c.a) {
                         event._no_attributes = true;
+                        //event.dump = attrs;
                     } else {
+                        /*
+                        if(!attrs.c.a) {
+                            console.dir(attrs.c);
+                        }
+                        */
                         if(!attrs.c.a.forEach) {
                             attrs.c.a = [attrs.c.a];
                         }
@@ -425,6 +431,9 @@ exports.q = function(config, item) {
         //output-opts
         if(config.attributes) {
             args.push("-attributes");
+            if(!Array.isArray(config.attributes)) {
+                config.attributes = [config.attributes];
+            }
             args.push(config.attributes.join(","));
         }
     } else {

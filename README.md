@@ -131,17 +131,18 @@ Outputs job entry..
 
 ```
 
-You can set various condor_q options.. like constraint. If you are expecting a lot of job entries to be returned, 
-you should almost always want to specify your attributes with condor_q... or it will be very inefficient.
+You can set various condor_q options.. like constraint, or attributes.
 
 ```javascript
 htcondor = require("htcondor");
-htcondor.q({constraint: "JobStatus==5", attributes: ["Iwd", "Owner", "JobStatus"]}, function(err, job) {
-    if(err) {
-        console.error(err);
-    }
-    console.log(JSON.stringify(item, null, 4));
-});
+htcondor.q({
+    constraint: "JobStatus==5", 
+    attributes: ["Iwd", "Owner", "JobStatus"]
+}, 
+function(err, jobs) {
+    console.log(JSON.stringify(jobs, null, 4));
+}
+);
 ```
 
 You can also use then() to receive all job entries in a single array.
