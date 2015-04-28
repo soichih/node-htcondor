@@ -243,7 +243,7 @@ function condor_simple(cmd, opts) {
 exports.remove = function(config, callback) {
     //console.log("calling condor_rm");
     //console.dir(opts);
-    var args = ['-totals'];
+    var args = [];
 
     if(typeof config === 'object') {
 
