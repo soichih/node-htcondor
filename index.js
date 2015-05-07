@@ -3,12 +3,12 @@ var spawn = require('child_process').spawn;
 var extend = require('util')._extend;
 
 var Tail = require('tail').Tail;
-var lib = require('./lib');
-var adparser = require('./lib').adparser;
+var adparser = require('./adparser').adparser;
 
 var temp = require('temp');
 var Q = require('q');
-var XML = require('xml-simple');
+//var XML = require('xml-simple');
+var xml2js = require('xml2js');
 
 var path = require('path');
 
@@ -52,21 +52,26 @@ exports.Joblog = function(path) {
         xml +="</c>";
         parse_jobxml(xml, function(event) {
             callbacks.forEach(function(callback) {
-                callback(event);
+                //see http://howtonode.org/understanding-process-next-tick
+                process.nextTick(function() {
+                    callback(event);
+                });
             });
         });
     });
 
+    var parser = new xml2js.Parser();
     function parse_jobxml(xml, callback) {
-        XML.parse(xml, function(err, attrs) {
+        //XML.parse(xml, function(err, attrs) {
+        parser.parseString(xml, function(err, attrs) {
             if(err) {
                 console.log("failed to parse job xml (skipping)");
                 console.error(err);
                 console.log(xml);
             } else {
                 var event = {};
-                attrs.a.forEach(function(attr) {
-                    var name = attr['@'].n;
+                attrs.c.a.forEach(function(attr) {
+                    var name = attr.$.n;
                     event[name] = parse_attrvalue(attr);
                 });
                 callback(event);
@@ -76,7 +81,6 @@ exports.Joblog = function(path) {
 };
 exports.Joblog.prototype = {
     onevent: function(call) {
-        //console.log("registering on event");
         this.callbacks.push(call);
     },
     unwatch: function() {
@@ -145,6 +149,7 @@ exports.submit = function(submit_options, config) {
             }
 
             //submit!
+            //console.log("spawning: condor_submit "+submit.path);
             condor_submit = spawn('condor_submit', ['-verbose', submit.path]);//, {cwd: __dirname});
 
             //load event
@@ -158,6 +163,7 @@ exports.submit = function(submit_options, config) {
             });
             //should I use exit instead of close?
             condor_submit.on('close', function (code, signal) {
+                //console.log("spawning (closed): condor_submit "+submit.path+ " code:"+code+" signal:"+signal);
                 if(code !== 0) {
                     console.error("submit failed with code:"+code);
                     console.error(stdout);
@@ -187,10 +193,7 @@ exports.submit = function(submit_options, config) {
     return deferred.promise;
 };
 
-//run simple condor command that takes job id as an argument
-function condor_simple(cmd, opts) {
-    var deferred = Q.defer();
-
+function get_condor_env() {
     //add some extra env params
     var env = extend({}, process.env);
     if (exports.config.condorConfig) {
@@ -202,7 +205,13 @@ function condor_simple(cmd, opts) {
                 path.join(exports.config.condorLocation, 'sbin') + ':' +
                 env.PATH;
     }
-    var p = spawn(cmd, opts, {env: env});//, {cwd: __dirname});
+    return env;
+}
+
+//run simple condor command that takes job id as an argument
+function condor_simple(cmd, opts) {
+    var deferred = Q.defer();
+    var p = spawn(cmd, opts, {env: get_condor_env()});//, {cwd: __dirname});
 
     //load event
     var stdout = "";
@@ -226,20 +235,55 @@ function condor_simple(cmd, opts) {
     return deferred.promise;
 }
 
-exports.remove = function(opts, callback) {
+exports.remove = function(config, callback) {
     //console.log("calling condor_rm");
     //console.dir(opts);
-    return condor_simple('condor_rm', opts).nodeify(callback);
-    /*
-    if(typeof id === 'array') {
-        console.log("array given. passing everything");
-        console.dir(id);
-        return condor_simple('condor_rm', id).nodeify(callback);
+    var args = [];
+
+    if(typeof config === 'object') {
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //general opts
+        if(config.name) { //name of scheduler
+            args.push("-name");
+            args.push(config.name);
+        }
+        if(config.pool) { //Use the given central manager to find daemons
+            args.push("-pool");
+            args.push(config.pool);
+        }
+        if(config.addr) { //Connect directly to the given "sinful string"
+            args.push("-addr");
+            args.push(config.addr);
+        }
+        if(config.reason) { //Use the given RemoveReason
+            args.push("-reason");
+            args.push(config.reason);
+        }
+        if(config.forces) { //Force the immediate local removal of jobs in the X state
+            args.push("-forcex");
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //restriction-list
+        if(config.id) { //job id (cluxster.proc)
+            args.push(config.id);
+        }
+        if(config.owner) { //Remove all jobs owned by user
+            args.push(config.owner);
+        }
+        if(config.constraint) { //Remove all jobs matching the boolean expression
+            args.push("-constraint");
+            args.push(config.constraint);
+        }
+        if(config.all) { //Remove all jobs (cannot be used with other constraints)
+            args.push("-all");
+        }
     } else {
-        //must be a single id
-        return condor_simple('condor_rm', [id]).nodeify(callback);
+        args.push(config); //must be a jobid, or user name
     }
-    */
+
+    return condor_simple('condor_rm', args).nodeify(callback);
 };
 exports.release = function(id, callback) {
     return condor_simple('condor_release', [id]).nodeify(callback);
@@ -247,62 +291,187 @@ exports.release = function(id, callback) {
 exports.hold = function(id, callback) {
     return condor_simple('condor_hold', [id]).nodeify(callback);
 };
-exports.q = function(id, callback) {
-    //console.log("condor_q -long -xml "+id);
+
+//you can receive callbacks for each item, or use .then() to recieve list of all items
+function condor_classads_stream(cmd, opts, item) {
     var deferred = Q.defer();
-
-    var args=['-long', '-xml'];
-    if(id)
-        args.push(id);
-
-    condor_simple('condor_q', args).then(function(stdout, stderr) {
-        //parse condor_q output
-        XML.parse(stdout, function(err, attrs) {
-            if(err) {
-                deferred.reject(err);
-            } else if(attrs) {
-
-                if (!attrs.c) {
-                    if (id) //the requested job was not found... error
-                        deferred.reject("Query for job "+id+" returned nothing");
-                    else //no query was specified => there are no jobs
-                        deferred.resolve([]);
+    var p = spawn(cmd, opts, {env: get_condor_env()});//, {cwd: __dirname});
+    var buffer = "";
+    var items = [];
+    
+    var parser = new xml2js.Parser();
+    function getblock() {
+        //look for start / end delimiter
+        var s = buffer.indexOf("\n<c>\n");
+        var e = buffer.indexOf("\n</c>\n");
+        if(s != -1 && e != -1) {
+            //var block = buffer.splice(spos, epos);
+            xml = buffer.substring(s, e+5);
+            buffer = buffer.substring(e+5);
+            //XML.parse(xml, function(err, attrs) {
+            parser.parseString(xml, function(err, attrs) {
+                //console.dir(xml);
+                if(err) {
+                    console.log("failed to parse job xml (skipping)");
+                    console.error(err);
+                    console.log(xml);
                 } else {
-
-                    //if not array, wrap in array
-                    var cs=Array.isArray(attrs.c)? attrs.c: [attrs.c];
-
-                    var jobs=cs.map(function(c) {
-
-                        var events = {};
-                        c.a.forEach(function(attr) {
-                            var name = attr['@'].n;
-                            events[name] = parse_attrvalue(attr);
+                    var event = {};
+                    if(!attrs.c || !attrs.c.a) {
+                        event._no_attributes = true;
+                        //event.dump = attrs;
+                    } else {
+                        /*
+                        if(!attrs.c.a) {
+                            console.dir(attrs.c);
+                        }
+                        */
+                        if(!attrs.c.a.forEach) {
+                            attrs.c.a = [attrs.c.a];
+                        }
+                        attrs.c.a.forEach(function(attr) {
+                            var name = attr.$.n;
+                            event[name] = parse_attrvalue(attr);
                         });
-                        return events;
-                    });
-
-                    //return one single job if only one was requested
-                    if(id && jobs.length>0)
-                        deferred.resolve(jobs[0]);
-                    else //return an array of jobs otherwise
-                        deferred.resolve(jobs);
+                    }
+                    if(item) {
+                        item(null, event);
+                    }
+                    items.push(event);
                 }
-            }
-        });
-    }, function(error) {
-        deferred.reject(error);
+            });
+            return true;
+        } else {
+            return false;
+        }
+    }
+    p.stdout.on('data', function (data) {
+        buffer += data.toString();
+        while(getblock());
     });
-    deferred.promise.nodeify(callback);
+
+    var stderr = "";
+    p.stderr.on('data', function (data) {
+        stderr += data;
+    });
+    p.on('error', function(err) {
+        console.error(err);
+        deferred.reject(err);
+        item(err);
+    });
+    p.on('close', function (code, signal) {
+        while(getblock());
+        if (signal) {
+            deferred.reject(cmd+ " was killed by signal "+ signal);
+            if(item) {
+                item({code: code, signal: signal, stdout: buffer, stderr: stderr});
+            }
+        } else if (code !== 0) {
+            deferred.reject(cmd+ " failed with exit code "+ code+ "\nSTDERR:"+ stderr + "\nbuffer:"+ buffer);
+            if(item) {
+                item({code: code, signal: signal, stdout: buffer, stderr: stderr});
+            }
+        } else {
+            deferred.resolve(items);
+        }
+    });
     return deferred.promise;
+}
+
+exports.q = function(config, item) {
+    var args = ['-xml'];
+
+    if(typeof config === 'object') {
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //general opts
+        if(config.global) { //queue all schedulers in this pool
+            args.push("-global");
+        }
+        if(config.submitter) { //get queue of specified submitter
+            args.push("-submitter");
+            args.push(config.submitter);
+        }
+        if(config.name) { //name of scheduler
+            args.push("-name");
+            args.push(config.name);
+        }
+        if(config.pool) { //use host as the central manager to query
+            args.push("-pool");
+            args.push(config.pool);
+        }
+        if(config.jobads) { //Read queue from a file of job ClassAds
+            args.push("-jobads");
+            args.push(config.jobads);
+        }
+        if(config.userlog) { //Read queue from a user log file
+            args.push("-userlog");
+            args.push(config.jobads);
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //restriction-list
+        if(config.id) { //job id (cluxster.proc)
+            args.push(config.id);
+        }
+        if(config.owner) { //job id (cluxster.proc)
+            args.push(config.owner);
+        }
+        if(config.constraint) { //Get information about jobs that match <expr>
+            args.push("-constraint");
+            args.push(config.constraint);
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //output-opts
+        if(config.attributes) {
+            args.push("-attributes");
+            if(!Array.isArray(config.attributes)) {
+                config.attributes = [config.attributes];
+            }
+            args.push(config.attributes.join(","));
+        }
+    } else {
+        args.push(config); //must be a jobid
+    }
+
+    return condor_classads_stream('condor_q', args, item);
 };
 
 exports.drain = function(id, opts, callback) {
-
     opts=opts||[];
     opts.push(id);
-
     return condor_simple('condor_drain', opts).nodeify(callback);
+};
+
+exports.dumpconfig = function(callback) {
+    var deferred = Q.defer();
+    condor_simple('condor_config_val', ['-dump', '-expand']).then(function(out) {
+        var outs = out.split("\n");
+        var configs = {};
+        outs.forEach(function(config) {
+                if(config[0] == "#") return;
+                if(config == "") return;
+                var tokens = config.split(" = "); 
+                //console.log(tokens[0] + " ... " + tokens[1]); 
+                var key = tokens[0];
+                var value = tokens[1];
+                switch(value.toLowerCase()) {
+                case "(null)":
+                    value = null; break;
+                case "false":
+                    value = false; break;
+                case "true":
+                    value = true; break;
+                }
+                configs[key] = value;
+        });
+        deferred.resolve(configs);
+    }).catch(function(err) {
+        deferred.reject(err);
+    });
+    deferred.promise.nodeify(callback);
+    return deferred.promise;
 };
 
 /* condor_history blocks!!!! WHY!
@@ -362,4 +531,16 @@ exports.eventlog = {
     unwatch: function() {
         this.tail.unwatch();
     }
-}
+};
+
+//for various condor related codes
+//https://htcondor-wiki.cs.wisc.edu/index.cgi/wiki?p=MagicNumbers
+exports.status_ids = {
+    0: {label: "Unexpanded", code: "U"},
+    1: {label: "Idle", code: "I"},
+    2: {label: "Running", code: "R"},
+    3: {label: "Removed", code: "X"},
+    4: {label: "Completed", code: "C"},
+    5: {label: "Held", code: "H"},
+    6: {label: "Submission Error", code: "E"},
+};

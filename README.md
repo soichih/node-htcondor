@@ -42,7 +42,7 @@ htcondor.submit(submit_options).then(function(job) {
     //console.dir(job.id);
 
     //you can *watch* job log
-    job.log.watch(function(event) {
+    job.log.onevent(function(event) {
         switch(event.MyType) {
 
         //normal status type events (just display content)
@@ -104,30 +104,57 @@ htcondor.release(job).then(function() {
 
 ## Query Jobs
 
-You may also query the jobs.  
+Wrapper for condor_q
 
 ```javascript
 htcondor = require("htcondor");
-htcondor.q()
-[
-    {
-        MaxHosts: 1,
-        Managed: 'Schedd',
-        User: 'user@blah.edu',
-        OnExitHold: false,
-        CoreSize: 0,
-        LastRemoteStatusUpdate: 1400098846,
-        LastHoldReason: 'Attempts to submit failed: Agent pid 58922\\\\n',
-        WantRemoteSyscalls: false,
-        MyType: 'Job',
-        Rank: 0,
-        ...
-    }
-    ...
-]
+htcondor.q({id: "59794891.0"},function(err, job) {
+    console.log(JSON.stringify(job, null, 4));
+});
 ```
 
+Outputs job entry..
 
+```
+{
+    "MATCH_EXP_JOB_GLIDEIN_Entry_Name": "CMS_T2_US_Caltech_cit",
+    "MaxHosts": 1,
+    "MemoryUsage": "expression:( ( ResidentSetSize + 1023 ) / 1024 )",
+    "MATCH_EXP_JOBGLIDEIN_ResourceName": "CIT_CMS_T2",
+    "MATCH_EXP_JOB_GLIDECLIENT_Name": "osg-flock-grid-iu-edu_OSG_gWMSFrontend.main",
+    "AccountingGroup": "group_xsedehigh.psiders",
+    "User": "psiders@osg-xsede.grid.iu.edu",
+    "NumJobReconnects": 1,
+    "OnExitHold": "expression:( ExitBySignal == true ) || ( ExitCode isnt 0 )",
+    "MATCH_GLIDEIN_ClusterId": 1998341,
+    "CoreSize": 0,
+...
+}
+
+```
+
+You can set various condor_q options.. like constraint, or attributes.
+
+```javascript
+htcondor = require("htcondor");
+htcondor.q({
+    constraint: "JobStatus==5", 
+    attributes: ["Iwd", "Owner", "JobStatus"]
+}, 
+function(err, jobs) {
+    console.log(JSON.stringify(jobs, null, 4));
+}
+);
+```
+
+You can also use then() to receive all job entries in a single array.
+
+```
+htcondor = require("htcondor");
+htcondor.q({constraint: "JobStatus==5"}).then(function(jobs) {
+    console.log(JSON.stringify(jobs, null, 4));
+});
+```
 
 ## eventlog watcher
 
@@ -188,6 +215,21 @@ Call unwatch() to stop watchin on eventlog
 eventlog.unwatch()
 ```
 
+## dump condor config
+
+(This is a prototype feature)
+
+You can dump all condor configs (in key/value dictionary).
+
+```javascript
+htcondor.dumpconfig().then(function(configs) {
+    console.dir(configs);
+}).catch(function(err) {
+    console.log("error occured");
+    console.dir(err);
+});
+```
+
 ## Configuring the module
 
 You may optionally configure the module by setting `config` variable if HTCondor binaries or configuration are located in a non-standard location.  Current options are:
@@ -199,6 +241,15 @@ You may optionally configure the module by setting `config` variable if HTCondor
   <dt>CondorConfig</dt>
   <dd>Location of the Condor configuration file.</dd>
 </dl>
+
+
+## Warning
+
+This module watches job log for all jobs you submit using Tail - which uses inotify kernel hook). Don't submit
+too many jobs at once (instead, throttle it - around 4000 - 5000 jobs each). You can see your current limit imposed by your OS by
+looking at /proc/sys/fs/inotify/max_user_watche 
+
+I might implement such throttling capability built into this module in the future..
 
 #License
 MIT. Please see License file for more details.
