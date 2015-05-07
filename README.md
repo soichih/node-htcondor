@@ -247,7 +247,7 @@ You may optionally configure the module by setting `config` variable if HTCondor
 
 This module watches job log for all jobs you submit using Tail - which uses inotify kernel hook). Don't submit
 too many jobs at once (instead, throttle it - around 4000 - 5000 jobs each). You can see your current limit imposed by your OS by
-looking at /proc/sys/fs/inotify/max_user_watche 
+looking at /proc/sys/fs/inotify/max_user_watches
 
 I might implement such throttling capability built into this module in the future..
 
