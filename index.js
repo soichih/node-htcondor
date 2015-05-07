@@ -51,11 +51,6 @@ exports.Joblog = function(path) {
     this.tail.on("line", function(xml) {
         xml +="</c>";
         parse_jobxml(xml, function(event) {
-            if(callbacks.length == 0) {
-                //I will never catch SubmitEvent, since the callback isn't registered until
-                //after submission completes... But they get the job object which contains
-                //pretty much the same info..
-            }
             callbacks.forEach(function(callback) {
                 //see http://howtonode.org/understanding-process-next-tick
                 process.nextTick(function() {
