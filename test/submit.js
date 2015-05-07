@@ -8,6 +8,8 @@ var submit_options = {
 
     //transfer_output_files: 'bogus',
 
+    requirements: '(Arch == "INTEL") || (Arch == "X86_64") && (machine == "grid-client-1")',
+
     shouldtransferfiles: "yes",
     when_to_transfer_output: "ON_EXIT",
     output: "stdout.txt",

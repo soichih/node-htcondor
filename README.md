@@ -22,6 +22,8 @@ var submit_options = {
 
     //transfer_output_files: 'bogus',
 
+    requirements: '(Arch == "INTEL") || (Arch == "X86_64") && (machine == "some_ce")',
+
     shouldtransferfiles: "yes",
     when_to_transfer_output: "ON_EXIT",
     output: "stdout.txt",
