@@ -283,6 +283,9 @@ exports.remove = function(config, callback) {
         args.push(config); //must be a jobid, or user name
     }
 
+    //console.log('spawing condor_rm with options\n');
+    //console.dir(config);
+    //console.dir(args);
     return condor_simple('condor_rm', args).nodeify(callback);
 };
 exports.release = function(id, callback) {
