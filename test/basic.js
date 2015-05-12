@@ -5,7 +5,7 @@ var should = chai.should;
 var expect = chai.expect;
 
 describe('submit', function() {
-    this.timeout(1000*60); //60 seconds enough?
+    this.timeout(1000*60*2); //2 minutes enouch?
     var job;
     it('should fail with missing executable', function(done) {
         htcondor.submit({
@@ -84,9 +84,11 @@ describe('submit', function() {
             queue: 1
         }).then(function(_job) {
             _job.onevent(function(event) {
-                console.log("received event");
-                console.dir(event);
-                done();
+                if(event.MyType == "ExecuteEvent") {
+                    console.log("received ExecuteEvent");
+                    //console.dir(event);
+                    done();
+                }
             });
         }).catch(function(err) {
             done(err);
@@ -99,8 +101,10 @@ describe('submit', function() {
             queue: 1
         }).then(function(_job) {
             _job.onevent(function(event) {
-                console.log("received event.. removing via shortcut");
-                _job.remove(done);
+                if(event.MyType == "ExecuteEvent") {
+                    console.log("received ExecuteEvent .. removing via shortcut");
+                    _job.remove(done);
+                }
             });
         }).catch(function(err) {
             done(err);
