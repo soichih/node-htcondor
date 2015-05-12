@@ -42,7 +42,7 @@ htcondor.submit(submit_options).then(function(job) {
     //console.dir(job.id);
 
     //you can *watch* job log
-    job.log.onevent(function(event) {
+    job.onevent(function(event) {
         switch(event.MyType) {
 
         //normal status type events (just display content)
@@ -58,7 +58,7 @@ htcondor.submit(submit_options).then(function(job) {
             console.dir(event);
 
             //I now stop the watcher (ends this submission)
-            job.log.unwatch();
+            job.unwatch();
             break;
 
         //job ended normally
@@ -68,14 +68,16 @@ htcondor.submit(submit_options).then(function(job) {
 
             //Do something based on the ReturnValue (resubmit, submit different job, etc..)
             console.log("return value:"+event.ReturnValue);
-            job.log.unwatch();
+
+            //If you submitted queue != 1, then you can look for Event.Proc to get the Process ID (0, 1, etc..)
+        
+            //If you are happy, just unwatch
+            job.unwatch();
             break;
 
-        //you might want to provide default in case of other events..
         default:
             console.log(event.MyType);
-            console.log("unknown event type.. stop watching");
-            job.log.unwatch();
+            console.log("unknown event type.. ignoring for now");
         }
     });
 });
@@ -85,20 +87,40 @@ htcondor.submit(submit_options).then(function(job) {
 You can do the usual condor stuff.
 
 ```
-htcondor.remove(job).then(function() {
+job.remove(function(err) {
+    if(err) throw err;
     console.log("successfully removed job");
 });
 ```
 
 ```
-htcondor.hold(job).then(function() {
+job.hold(function(err) {
+    if(err) throw err;
     console.log("successfully held job");
 });
 ```
 
 ```
-htcondor.release(job).then(function() {
+job.release(function(err) {
+    if(err) throw err;
     console.log("successfully released job");
+});
+```
+
+You can also call via htcondor object
+
+```
+htcondor.remove(job, function(err) {
+    if(err) throw err;
+    console.log("successfully removed job");
+});
+```
+
+Also, if you are modern, you can use "then" .. on most htcondor methods.
+
+```
+htcondor.remove(job).then(function() {
+    console.log("successfully removed job");
 });
 ```
 
@@ -147,7 +169,10 @@ function(err, jobs) {
 );
 ```
 
-You can also use then() to receive all job entries in a single array.
+In above, node-htcondor will "stream" output from htcondor q output - so callbacks will be called as soon as each job info 
+is parsed - instead of waiting until all jobs info is received.
+
+Alternatively, then() will not stream but wait until it receives all job entries in a single array.
 
 ```
 htcondor = require("htcondor");
@@ -245,11 +270,10 @@ You may optionally configure the module by setting `config` variable if HTCondor
 
 ## Warning
 
-This module watches job log for all jobs you submit using Tail - which uses inotify kernel hook. Don't submit
-too many jobs at once (instead, throttle it - around 4000 - 5000 jobs each). You can see your current limit imposed by your OS by
-looking at /proc/sys/fs/inotify/max_user_watches
-
-I might implement such throttling capability built into this module in the future..
+node-htcondor watches job logsi for all jobs submitted using Tail - which uses inotify kernel hook. Don't submit
+too many jobs at once. You need to throttle it so that you won't exeed your inotify limit imposed by your OS. (See
+/proc/sys/fs/inotify/max_user_watches) I might implement such throttling capability built into this module in the future..
 
 #License
 MIT. Please see License file for more details.
+

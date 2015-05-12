@@ -23,21 +23,21 @@ exports.config = {
 
 function parse_attrvalue(attr) {
     if(attr.s) {
-        return attr.s;
+        return attr.s[0];
     }
     if(attr.i) {
-        return parseInt(attr.i);
+        return parseInt(attr.i[0]);
     }
     if(attr.b) {
         if(attr.v == "t") return true;
         return false;
     }
     if(attr.r) {
-        return parseFloat(attr.r);
+        return parseFloat(attr.r[0]);
     }
     if(attr.e) {
         //TODO
-        return "expression:"+attr.e;
+        return "expression:"+attr.e[0];
     }
     console.log("don't know how to parse");
     console.dir(attr);
@@ -62,13 +62,14 @@ exports.Joblog = function(path) {
 
     var parser = new xml2js.Parser();
     function parse_jobxml(xml, callback) {
-        //XML.parse(xml, function(err, attrs) {
         parser.parseString(xml, function(err, attrs) {
             if(err) {
                 console.log("failed to parse job xml (skipping)");
                 console.error(err);
                 console.log(xml);
             } else {
+                //console.log(xml);
+                //console.log(JSON.stringify(attrs, null, 4));
                 var event = {};
                 attrs.c.a.forEach(function(attr) {
                     var name = attr.$.n;
@@ -178,14 +179,19 @@ exports.submit = function(submit_options, config) {
                     var header_tokens = header.split(" ");
                     var jobid = header_tokens[2];
                     jobid = jobid.substring(0, jobid.length - 1); //remove last :
-                    //jobid = jobid.split(".");
-                    deferred.resolve({
-                        //creating "job" object
+                    var job = {
                         id: jobid,
                         props: adparser.parse(lines),
                         options: submit_options,
                         log: joblog
-                    });
+                    };
+                    
+                    //add access to joblog functions through job object
+                    job.onevent = joblog.onevent.bind(joblog);
+                    job.unwatch = joblog.unwatch.bind(joblog);
+                    job.remove = htcondor_remove.bind(joblog, jobid);
+
+                    deferred.resolve(job);
                 }
             });
         });
@@ -235,7 +241,7 @@ function condor_simple(cmd, opts) {
     return deferred.promise;
 }
 
-exports.remove = function(config, callback) {
+function htcondor_remove(config, callback) {
     //console.log("calling condor_rm");
     //console.dir(opts);
     var args = [];
@@ -287,15 +293,15 @@ exports.remove = function(config, callback) {
     //console.dir(config);
     //console.dir(args);
     return condor_simple('condor_rm', args).nodeify(callback);
-};
-exports.release = function(id, callback) {
+}
+function htcondor_release(id, callback) {
     return condor_simple('condor_release', [id]).nodeify(callback);
-};
-exports.hold = function(id, callback) {
+}
+function htcondor_hold(id, callback) {
     return condor_simple('condor_hold', [id]).nodeify(callback);
-};
+}
 
-//you can receive callbacks for each item, or use .then() to recieve list of all items
+//you can receive callbacks for each item (streaming), or use .then() to recieve list of all items
 function condor_classads_stream(cmd, opts, item) {
     var deferred = Q.defer();
     var p = spawn(cmd, opts, {env: get_condor_env()});//, {cwd: __dirname});
@@ -324,11 +330,6 @@ function condor_classads_stream(cmd, opts, item) {
                         event._no_attributes = true;
                         //event.dump = attrs;
                     } else {
-                        /*
-                        if(!attrs.c.a) {
-                            console.dir(attrs.c);
-                        }
-                        */
                         if(!attrs.c.a.forEach) {
                             attrs.c.a = [attrs.c.a];
                         }
@@ -381,7 +382,7 @@ function condor_classads_stream(cmd, opts, item) {
     return deferred.promise;
 }
 
-exports.q = function(config, item) {
+function htcondor_q(config, item) {
     var args = ['-xml'];
 
     if(typeof config === 'object') {
@@ -439,15 +440,15 @@ exports.q = function(config, item) {
     }
 
     return condor_classads_stream('condor_q', args, item);
-};
+}
 
-exports.drain = function(id, opts, callback) {
+function htcondor_drain(id, opts, callback) {
     opts=opts||[];
     opts.push(id);
     return condor_simple('condor_drain', opts).nodeify(callback);
-};
+}
 
-exports.dumpconfig = function(callback) {
+function htcondor_dumpconfig(callback) {
     var deferred = Q.defer();
     condor_simple('condor_config_val', ['-dump', '-expand']).then(function(out) {
         var outs = out.split("\n");
@@ -475,7 +476,7 @@ exports.dumpconfig = function(callback) {
     });
     deferred.promise.nodeify(callback);
     return deferred.promise;
-};
+}
 
 /* condor_history blocks!!!! WHY!
 exports.history = function(id, callback) {
@@ -502,7 +503,7 @@ exports.history = function(id, callback) {
 };
 */
 
-exports.eventlog = {
+var htcondor_eventlog = {
     tail: null,
     callbacks: [],
     on: function(callback) {
@@ -547,3 +548,12 @@ exports.status_ids = {
     5: {label: "Held", code: "H"},
     6: {label: "Submission Error", code: "E"},
 };
+
+exports.remove = htcondor_remove;
+exports.release = htcondor_release;
+exports.hold = htcondor_hold;
+exports.eventlog = htcondor_eventlog;
+exports.drain = htcondor_drain;
+exports.dumpconfig = htcondor_dumpconfig;
+exports.q = htcondor_q;
+

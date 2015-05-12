@@ -5,6 +5,7 @@ var should = chai.should;
 var expect = chai.expect;
 
 describe('submit', function() {
+    this.timeout(1000*60); //60 seconds enough?
     var job;
     it('should fail with missing executable', function(done) {
         htcondor.submit({
@@ -72,6 +73,35 @@ describe('submit', function() {
         htcondor.remove(job.id).then(function(ret) {
             console.log(ret);
             done();
+        }).catch(function(err) {
+            done(err);
+        });
+    });
+    it('should submit to vanilla and receive event', function(done) {
+        htcondor.submit({
+            universe: "vanilla",
+            executable: "/bin/hostname",
+            queue: 1
+        }).then(function(_job) {
+            _job.onevent(function(event) {
+                console.log("received event");
+                console.dir(event);
+                done();
+            });
+        }).catch(function(err) {
+            done(err);
+        });
+    });
+    it('should submit to vanilla and remove via shortcut', function(done) {
+        htcondor.submit({
+            universe: "vanilla",
+            executable: "/bin/hostname",
+            queue: 1
+        }).then(function(_job) {
+            _job.onevent(function(event) {
+                console.log("received event.. removing via shortcut");
+                _job.remove(done);
+            });
         }).catch(function(err) {
             done(err);
         });

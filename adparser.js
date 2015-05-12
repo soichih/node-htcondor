@@ -22,6 +22,8 @@ exports.adparser = {
         return v;
     },
     parse: function(lines) {
+        //console.log("dumping lines...............................");
+        //console.dir(lines);
         //parse class ad key/value
         var props = {};
         var cont = null;
@@ -56,6 +58,8 @@ exports.adparser = {
                 }
             }
         });
+        //console.log("persed too.....................");
+        //console.dir(props);
         return props;
     }
 }
