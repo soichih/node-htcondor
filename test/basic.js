@@ -5,7 +5,7 @@ var should = chai.should;
 var expect = chai.expect;
 
 describe('submit', function() {
-    this.timeout(1000*60*2); //2 minutes enouch?
+    this.timeout(1000*60*3); //3 minutes enouch?
     var job;
     it('should fail with missing executable', function(done) {
         htcondor.submit({
