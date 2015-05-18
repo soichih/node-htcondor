@@ -121,7 +121,9 @@ Also, if you are modern, you can use "then" .. on most htcondor methods.
 ```
 htcondor.remove(job).then(function() {
     console.log("successfully removed job");
-});
+}).fail(function(err) {
+    //handle err
+});;
 ```
 
 ## Query Jobs

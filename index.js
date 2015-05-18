@@ -294,15 +294,29 @@ function htcondor_remove(cmd, config, callback) {
     //console.dir(args);
     return condor_simple(cmd, args).nodeify(callback);
 }
-function htcondor_release(cmd, id, callback) {
-    return condor_simple(cmd, [id]).nodeify(callback);
+function htcondor_release(cmd, opts, callback) {
+    if(opts && !callback) {
+        callback = opts;
+        opts = undefined;
+    }
+    if(opts && !(opts instanceof Array)) {
+        opts = [opts];
+    }
+    return condor_simple(cmd, opts).nodeify(callback);
 }
-function htcondor_hold(cmd, id, callback) {
-    return condor_simple(cmd, [id]).nodeify(callback);
+function htcondor_hold(cmd, opts, callback) {
+    if(opts && !callback) {
+        callback = opts;
+        opts = undefined;
+    }
+    if(opts && !(opts instanceof Array)) {
+        opts = [opts];
+    }
+    return condor_simple(cmd, ids).nodeify(callback);
 }
 
 //you can receive callbacks for each item (streaming), or use .then() to recieve list of all items
-function condor_classads_stream(cmd, opts, item) {
+function condor_classads_stream(cmd, opts, cb) {
     var deferred = Q.defer();
     var p = spawn(cmd, opts, {env: get_condor_env()});//, {cwd: __dirname});
     var buffer = "";
@@ -338,8 +352,8 @@ function condor_classads_stream(cmd, opts, item) {
                             event[name] = parse_attrvalue(attr);
                         });
                     }
-                    if(item) {
-                        item(null, event);
+                    if(cb) {
+                        cb(null, event);
                     }
                     items.push(event);
                 }
@@ -361,19 +375,19 @@ function condor_classads_stream(cmd, opts, item) {
     p.on('error', function(err) {
         console.error(err);
         deferred.reject(err);
-        item(err);
+        cb(err);
     });
     p.on('close', function (code, signal) {
         while(getblock());
         if (signal) {
             deferred.reject(cmd+ " was killed by signal "+ signal);
-            if(item) {
-                item({code: code, signal: signal, stdout: buffer, stderr: stderr});
+            if(cb) {
+                cb({code: code, signal: signal, stdout: buffer, stderr: stderr});
             }
         } else if (code !== 0) {
             deferred.reject(cmd+ " failed with exit code "+ code+ "\nSTDERR:"+ stderr + "\nbuffer:"+ buffer);
-            if(item) {
-                item({code: code, signal: signal, stdout: buffer, stderr: stderr});
+            if(cb) {
+                cb({code: code, signal: signal, stdout: buffer, stderr: stderr});
             }
         } else {
             deferred.resolve(items);
@@ -382,11 +396,12 @@ function condor_classads_stream(cmd, opts, item) {
     return deferred.promise;
 }
 
-function htcondor_q(cmd, config, item) {
+function htcondor_q(cmd, config, cb) {
     var args = ['-xml'];
-    //console.log("running htcondor_q:"+cmd);
-    //console.dir(item);
-
+    if(typeof config === 'function' && !cb) {
+        cb = config;
+        config = undefined;
+    }
     if(typeof config === 'object') {
 
         ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -437,11 +452,11 @@ function htcondor_q(cmd, config, item) {
             }
             args.push(config.attributes.join(","));
         }
-    } else {
-        args.push(config); //must be a jobid
+    } else if(config) {
+        args.push(config); //treat it as a jobid
     }
 
-    return condor_classads_stream(cmd, args, item);
+    return condor_classads_stream(cmd, args, cb);
 }
 
 function htcondor_drain(id, opts, callback) {
