@@ -189,7 +189,7 @@ exports.submit = function(submit_options, config) {
                     //add access to joblog functions through job object
                     job.onevent = joblog.onevent.bind(joblog);
                     job.unwatch = joblog.unwatch.bind(joblog);
-                    job.remove = htcondor_remove.bind(joblog, jobid);
+                    job.remove = htcondor_remove.bind(undefined, 'condor_rm', jobid);
 
                     deferred.resolve(job);
                 }
@@ -241,7 +241,7 @@ function condor_simple(cmd, opts) {
     return deferred.promise;
 }
 
-function htcondor_remove(config, callback) {
+function htcondor_remove(cmd, config, callback) {
     //console.log("calling condor_rm");
     //console.dir(opts);
     var args = [];
@@ -292,13 +292,13 @@ function htcondor_remove(config, callback) {
     //console.log('spawing condor_rm with options\n');
     //console.dir(config);
     //console.dir(args);
-    return condor_simple('condor_rm', args).nodeify(callback);
+    return condor_simple(cmd, args).nodeify(callback);
 }
-function htcondor_release(id, callback) {
-    return condor_simple('condor_release', [id]).nodeify(callback);
+function htcondor_release(cmd, id, callback) {
+    return condor_simple(cmd, [id]).nodeify(callback);
 }
-function htcondor_hold(id, callback) {
-    return condor_simple('condor_hold', [id]).nodeify(callback);
+function htcondor_hold(cmd, id, callback) {
+    return condor_simple(cmd, [id]).nodeify(callback);
 }
 
 //you can receive callbacks for each item (streaming), or use .then() to recieve list of all items
@@ -382,8 +382,10 @@ function condor_classads_stream(cmd, opts, item) {
     return deferred.promise;
 }
 
-function htcondor_q(config, item) {
+function htcondor_q(cmd, config, item) {
     var args = ['-xml'];
+    //console.log("running htcondor_q:"+cmd);
+    //console.dir(item);
 
     if(typeof config === 'object') {
 
@@ -439,7 +441,7 @@ function htcondor_q(config, item) {
         args.push(config); //must be a jobid
     }
 
-    return condor_classads_stream('condor_q', args, item);
+    return condor_classads_stream(cmd, args, item);
 }
 
 function htcondor_drain(id, opts, callback) {
@@ -549,11 +551,19 @@ exports.status_ids = {
     6: {label: "Submission Error", code: "E"},
 };
 
-exports.remove = htcondor_remove;
-exports.release = htcondor_release;
-exports.hold = htcondor_hold;
+exports.remove = htcondor_remove.bind(undefined, 'condor_rm');
+exports.release = htcondor_release.bind(undefined, 'condor_release');
+exports.hold = htcondor_hold.bind(undefined, 'condor_hold');
+exports.q = htcondor_q.bind(undefined, 'condor_q');
+
 exports.eventlog = htcondor_eventlog;
 exports.drain = htcondor_drain;
 exports.dumpconfig = htcondor_dumpconfig;
-exports.q = htcondor_q;
+
+//condor-cron interfaces
+exports.cron_remove = htcondor_remove.bind(undefined, 'condor_cron_rm');
+exports.cron_release = htcondor_release.bind(undefined, 'condor_cron_release');
+exports.cron_hold = htcondor_hold.bind(undefined, 'condor_cron_hold');
+exports.cron_q = htcondor_q.bind(undefined,'condor_cron_q');
+
 
