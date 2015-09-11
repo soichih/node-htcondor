@@ -10,7 +10,7 @@ npm install htcondor
 
 You can submit a condor job and watch for joblog.
 
-```
+```javascript
 var htcondor = require('htcondor');
 
 //create condor submit object
@@ -70,7 +70,7 @@ htcondor.submit(submit_options).then(function(job) {
             console.log("return value:"+event.ReturnValue);
 
             //If you submitted queue != 1, then you can look for Event.Proc to get the Process ID (0, 1, etc..)
-        
+
             //If you are happy, just unwatch
             job.unwatch();
             break;
@@ -86,21 +86,21 @@ htcondor.submit(submit_options).then(function(job) {
 
 You can do the usual condor stuff.
 
-```
+```javascript
 job.remove(function(err) {
     if(err) throw err;
     console.log("successfully removed job");
 });
 ```
 
-```
+```javascript
 job.hold(function(err) {
     if(err) throw err;
     console.log("successfully held job");
 });
 ```
 
-```
+```javascript
 job.release(function(err) {
     if(err) throw err;
     console.log("successfully released job");
@@ -109,7 +109,7 @@ job.release(function(err) {
 
 You can also call via htcondor object
 
-```
+```javascript
 htcondor.remove(job, function(err) {
     if(err) throw err;
     console.log("successfully removed job");
@@ -118,7 +118,7 @@ htcondor.remove(job, function(err) {
 
 Also, if you are modern, you can use "then" .. on most htcondor methods.
 
-```
+```javascript
 htcondor.remove(job).then(function() {
     console.log("successfully removed job");
 }).fail(function(err) {
@@ -139,7 +139,7 @@ htcondor.q({id: "59794891.0"},function(err, job) {
 
 Outputs job entry..
 
-```
+```json
 {
     "MATCH_EXP_JOB_GLIDEIN_Entry_Name": "CMS_T2_US_Caltech_cit",
     "MaxHosts": 1,
@@ -162,21 +162,21 @@ You can set various condor_q options.. like constraint, or attributes.
 ```javascript
 htcondor = require("htcondor");
 htcondor.q({
-    constraint: "JobStatus==5", 
+    constraint: "JobStatus==5",
     attributes: ["Iwd", "Owner", "JobStatus"]
-}, 
+},
 function(err, jobs) {
     console.log(JSON.stringify(jobs, null, 4));
 }
 );
 ```
 
-In above, node-htcondor will "stream" output from htcondor q output - so callbacks will be called as soon as each job info 
+In above, node-htcondor will "stream" output from htcondor q output - so callbacks will be called as soon as each job info
 is parsed - instead of waiting until all jobs info is received.
 
 Alternatively, then() will not stream but wait until it receives all job entries in a single array.
 
-```
+```javascript
 htcondor = require("htcondor");
 htcondor.q({constraint: "JobStatus==5"}).then(function(jobs) {
     console.log(JSON.stringify(jobs, null, 4));
@@ -278,4 +278,3 @@ too many jobs at once. You need to throttle it so that you won't exeed your inot
 
 #License
 MIT. Please see License file for more details.
-
