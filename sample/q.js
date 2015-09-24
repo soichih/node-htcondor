@@ -2,7 +2,13 @@
 htcondor = require("../index.js");
 
 //dump all
+/*
 htcondor.q().then(function(jobs) {
+    console.log("jobs :"+jobs.length);
+    console.dir(jobs);
+});
+*/
+htcondor.q({user:""}).then(function(jobs) {
     console.log("jobs :"+jobs.length);
     console.dir(jobs);
 });

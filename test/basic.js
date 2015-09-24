@@ -39,6 +39,15 @@ describe('submit', function() {
             done(err);
         });
     });
+    it('should query without any parameter and should find the job', function(done) {
+        htcondor.q().then(function(jobs) {
+            expect(jobs.length).to.equal(1);
+            console.log(jobs);
+            done();
+        }).catch(function(err) {
+            done(err);
+        });
+    });
     it('should remove the job submitted earlier', function(done) {
         htcondor.remove(job).then(function(ret) {
             console.log(ret);

@@ -241,7 +241,7 @@ function condor_simple(cmd, opts) {
     return deferred.promise;
 }
 
-function htcondor_remove(cmd, config, callback) {
+function htcondor_remove(cmd, config, cb) {
     //console.log("calling condor_rm");
     //console.dir(opts);
     var args = [];
@@ -285,14 +285,16 @@ function htcondor_remove(cmd, config, callback) {
         if(config.all) { //Remove all jobs (cannot be used with other constraints)
             args.push("-all");
         }
-    } else {
-        args.push(config); //must be a jobid, or user name
+    } else if(typeof config === 'string') {
+        args.push(config); //treat it as a jobid
+    } else if(typeof config === 'function' && cb === undefined) {
+        cb = config; //treat it as cb
     }
 
     //console.log('spawing condor_rm with options\n');
     //console.dir(config);
     //console.dir(args);
-    return condor_simple(cmd, args).nodeify(callback);
+    return condor_simple(cmd, args).nodeify(cb);
 }
 function htcondor_release(cmd, opts, callback) {
     if(opts && !callback) {
@@ -452,8 +454,10 @@ function htcondor_q(cmd, config, cb) {
             }
             args.push(config.attributes.join(","));
         }
-    } else if(config) {
+    } else if(typeof config === 'string') {
         args.push(config); //treat it as a jobid
+    } else if(typeof config === 'function' && cb === undefined) {
+        cb = config; //treat it as cb
     }
 
     return condor_classads_stream(cmd, args, cb);
